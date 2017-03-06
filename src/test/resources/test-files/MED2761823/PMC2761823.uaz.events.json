@@ -1,0 +1,56 @@
+{
+  "frames":[
+    {
+      "text":"NAADP binding to TPC2",
+      "frame-id":"evem-PMC2761823-UAZ-r1-127-0-1",
+      "arguments":[
+        {
+          "text":"NAADP",
+          "argument-type":"entity",
+          "object-type":"argument",
+          "index":0,
+          "argument-label":"theme",
+          "arg":"ment-PMC2761823-UAZ-r1-127-0-219"
+        },
+        {
+          "text":"TPC2",
+          "argument-type":"entity",
+          "object-type":"argument",
+          "index":1,
+          "argument-label":"theme",
+          "arg":"ment-PMC2761823-UAZ-r1-127-0-220"
+        }
+      ],
+      "type":"complex-assembly",
+      "frame-type":"event-mention",
+      "end-pos":{
+        "reference":"pass-PMC2761823-UAZ-r1-127",
+        "offset":26,
+        "object-type":"relative-pos"
+      },
+      "object-type":"frame",
+      "start-pos":{
+        "reference":"pass-PMC2761823-UAZ-r1-127",
+        "offset":5,
+        "object-type":"relative-pos"
+      },
+      "found-by":"binding7a",
+      "sentence":"sent-PMC2761823-UAZ-r1-127-0",
+      "verbose-text":"[ 32P ] NAADP binding to TPC2",
+      "object-meta":{
+        "component":"REACH",
+        "object-type":"meta-info"
+      }
+    }
+  ],
+  "object-type":"frame-collection",
+  "object-meta":{
+    "processing-end":"2015-06-14T21:33:46Z",
+    "doc-id":"PMC2761823",
+    "component-type":"machine",
+    "component":"REACH",
+    "processing-start":"2015-06-14T21:32:33Z",
+    "object-type":"meta-info",
+    "organization":"UAZ"
+  }
+}

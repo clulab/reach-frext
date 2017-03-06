@@ -1,0 +1,57 @@
+{
+  "frames":[
+    {
+      "frame-id":"evem-AAPS_PharmSciTech_2014_Jul_15_15(6)_1490-1497-UAZ-r1-86-1-1",
+      "text":"diltiazem which had an increased Tmax and decreased Cmax",
+      "arguments":[
+        {
+          "text":"Cmax",
+          "argument-type":"entity",
+          "object-type":"argument",
+          "index":0,
+          "argument-label":"controlled",
+          "arg":"ment-AAPS_PharmSciTech_2014_Jul_15_15(6)_1490-1497-UAZ-r1-86-1-226"
+        },
+        {
+          "text":"diltiazem",
+          "argument-type":"entity",
+          "object-type":"argument",
+          "index":0,
+          "argument-label":"controller",
+          "arg":"ment-AAPS_PharmSciTech_2014_Jul_15_15(6)_1490-1497-UAZ-r1-86-1-225"
+        }
+      ],
+      "type":"activation",
+      "frame-type":"event-mention",
+      "subtype":"negative-activation",
+      "end-pos":{
+        "reference":"pass-AAPS_PharmSciTech_2014_Jul_15_15(6)_1490-1497-UAZ-r1-86",
+        "offset":219,
+        "object-type":"relative-pos"
+      },
+      "object-type":"frame",
+      "start-pos":{
+        "reference":"pass-AAPS_PharmSciTech_2014_Jul_15_15(6)_1490-1497-UAZ-r1-86",
+        "offset":163,
+        "object-type":"relative-pos"
+      },
+      "sentence":"sent-AAPS_PharmSciTech_2014_Jul_15_15(6)_1490-1497-UAZ-r1-86-1",
+      "found-by":"Negative_activation_syntax_5_verb",
+      "object-meta":{
+        "component":"REACH",
+        "object-type":"meta-info"
+      },
+      "verbose-text":"This is also reported by Lennernas for diltiazem which had an increased Tmax and decreased Cmax when directly instilled into the colon compared to the absorption in the small intestine."
+    }
+  ],
+  "object-type":"frame-collection",
+  "object-meta":{
+    "processing-end":"2015-07-22T17:48:31Z",
+    "doc-id":"AAPS_PharmSciTech_2014_Jul_15_15(6)_1490-1497",
+    "component-type":"machine",
+    "component":"REACH",
+    "processing-start":"2015-07-22T17:46:50Z",
+    "object-type":"meta-info",
+    "organization":"UAZ"
+  }
+}

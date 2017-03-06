@@ -1,0 +1,49 @@
+{
+  "frames":[
+    {
+      "frame-id":"evem-PMC2120229-UAZ-r1-1-5-1",
+      "text":"hypophosphorylated form of p110RB",
+      "arguments":[
+        {
+          "text":"p110RB",
+          "argument-type":"entity",
+          "object-type":"argument",
+          "index":0,
+          "argument-label":"theme",
+          "arg":"ment-PMC2120229-UAZ-r1-1-5-12"
+        }
+      ],
+      "type":"protein-modification",
+      "frame-type":"event-mention",
+      "subtype":"phosphorylation",
+      "end-pos":{
+        "reference":"pass-PMC2120229-UAZ-r1-1",
+        "offset":896,
+        "object-type":"relative-pos"
+      },
+      "object-type":"frame",
+      "start-pos":{
+        "reference":"pass-PMC2120229-UAZ-r1-1",
+        "offset":863,
+        "object-type":"relative-pos"
+      },
+      "sentence":"sent-PMC2120229-UAZ-r1-1-5",
+      "found-by":"Phosphorylation_syntax_1_verb",
+      "object-meta":{
+        "component":"REACH",
+        "object-type":"meta-info"
+      },
+      "verbose-text":"Furthermore , both in vivo and in vitro experiments demonstrate that p84 binds preferentially to the functionally active , hypophosphorylated form of p110RB ."
+    }
+  ],
+  "object-type":"frame-collection",
+  "object-meta":{
+    "processing-end":"2015-06-14T20:59:52Z",
+    "doc-id":"PMC2120229",
+    "component-type":"machine",
+    "component":"REACH",
+    "processing-start":"2015-06-14T20:59:49Z",
+    "object-type":"meta-info",
+    "organization":"UAZ"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "analysis" : {
+    "tokenizer": {
+      "underscore_tokenizer": {
+        "type": "pattern",
+        "pattern": "_"
+      }
+    },
+    "filter": {
+      "token_length": {
+        "type": "length",
+        "min": 2
+      }
+    },
+    "analyzer": {
+      "lowerWS": {
+        "type": "custom",
+        "tokenizer": "whitespace",
+        "filter": [ "token_length", "lowercase" ]
+      }
+    },
+    "analyzer": {
+      "lowerNoTok": {
+        "type": "custom",
+        "tokenizer": "keyword",
+        "filter": [ "token_length", "lowercase" ]
+      }
+    },
+    "analyzer": {
+      "PMfilename": {
+        "type": "custom",
+        "tokenizer": "underscore_tokenizer",
+        "filter": [ "token_length", "lowercase" ]
+      }
+    }
+  }
+}

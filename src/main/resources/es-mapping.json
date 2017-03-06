@@ -1,0 +1,90 @@
+{
+  "conn": {
+    "properties": {
+      "docId": {
+        "type": "string",
+        "index": "not_analyzed"
+      },
+      "loc": {
+        "properties": {
+          "sentence": {
+            "type": "string",
+            "analyzer": "standard"
+          }
+        }
+      },
+      "a": {
+        "properties": {
+          "eId": {
+            "type": "string",
+            "index": "not_analyzed"
+          },
+          "eNs": {
+            "type": "string",
+            "index": "not_analyzed"
+          },
+          "eText": {
+            "type": "string",
+            "analyzer": "lowerNoTok",
+            "fields": {
+              "raw": {
+                "type": "string",
+                "index": "not_analyzed"
+              }
+            }
+          },
+          "eType": {
+            "type": "string",
+            "index": "not_analyzed"
+          }
+        }
+      },
+      "p": {
+        "properties": {
+          "rule": {
+            "type": "string",
+            "index": "not_analyzed"
+          },
+          "sign": {
+            "type": "string",
+            "index": "not_analyzed"
+          },
+          "subtype": {
+            "type": "string",
+            "index": "not_analyzed"
+          },
+          "type": {
+            "type": "string",
+            "index": "not_analyzed"
+          }
+        }
+      },
+      "t": {
+        "properties": {
+          "eId": {
+            "type": "string",
+            "index": "not_analyzed"
+          },
+          "eNs": {
+            "type": "string",
+            "index": "not_analyzed"
+          },
+          "eText": {
+            "type": "string",
+            "analyzer": "lowerNoTok",
+            "fields": {
+              "raw": {
+                "type": "string",
+                "index": "not_analyzed"
+              }
+            }
+          },
+          "eType": {
+            "type": "string",
+            "index": "not_analyzed"
+          }
+        }
+      }
+    }
+  }
+}

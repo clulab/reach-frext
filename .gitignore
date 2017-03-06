@@ -1,0 +1,8 @@
+*.iws
+.DS_Store
+.settings
+/*.log
+/*.zip
+/.gradle/
+/build/
+out
