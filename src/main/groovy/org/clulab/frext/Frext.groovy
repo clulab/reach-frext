@@ -13,7 +13,7 @@ import groovy.util.CliBuilder
  * a format, ingestable by an OHSU Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Update for formatter class rename and removal of loader class.
+ *   Last Modified: Add output directory option.
  */
 class Frext implements FilenameFilter {
 
@@ -32,13 +32,15 @@ class Frext implements FilenameFilter {
   /** Main program entry point. */
   public static void main (String[] args) {
     // read, parse, and validate command line arguments
-    def usage = 'frext [-h] [-m] [-v] directory'
+    def usage = 'frext [-h] [-m] [-v] [-o output-directory] input-directory'
     def cli = new CliBuilder(usage: usage)
     cli.width = 100                         // increase usage message width
     cli.with {
-      h(longOpt:  'help',     'Show usage information.')
-      m(longOpt:  'map',      'Map input filenames to PMC IDs (default: no mapping needed).')
-      v(longOpt:  'verbose',  'Run in verbose mode (default: non-verbose).')
+      h(longOpt: 'help',    'Show usage information.')
+      m(longOpt: 'map',     'Map input filenames to PMC IDs (default: no mapping needed).')
+      o(longOpt: 'outdir',   args:1, argName: 'outDir',
+                            'Directory for output files (default: current directory).')
+      v(longOpt: 'verbose', 'Run in verbose mode (default: non-verbose).')
     }
 
     def options = cli.parse(args)           // parse command line
@@ -47,17 +49,33 @@ class Frext implements FilenameFilter {
     if (!options) return                    // exit out on problem
     if (options.h || options.arguments().isEmpty()) {
       cli.usage()                           // show usage and exit on help
-      return                                // exit out now
+      System.exit(1)                        // exit out now
     }
 
-    // instantiate this class and validate required directory argument
-    def frext = new Frext(options)
-    File directory = frext.goodDirPath(options.arguments()[0])
-    if (!directory) return                  // problem with directory: exit out now
+    def frext = new Frext(options)          // instantiate this class
+
+    // validate required and optional directory arguments
+    def inDirPath = options.arguments()[0]
+    File inDir = frext.goodDirPath(inDirPath)
+    if (!inDir) {
+      System.err.println("Unable to open input directory ${inDirPath} for reading...exiting")
+      System.exit(2)                        // problem with input directory: exit out now
+    }
+
+    def outDirPath = (options.o) ? options.o : '.'
+    File outDir = frext.goodDirPath(outDirPath, true) // true = check for writeable
+    if (!outDir) {
+      System.err.println("Unable to open output directory ${outDirPath} for writing...exiting")
+      System.exit(3)                        // problem with output directory: exit out now
+    }
 
     // map settings and begin to load files
     def settings = [ 'mapFilenames': options.m ?: false,
+                     'outDir': options.o ?: '.',
                      'verbose': options.v ?: false ]
+
+    if (options.v)
+      log.info("(Frext.main): Will output extraction files to: '${outDir}'")
 
     // if mapping filenames, then load the table of filenames and ids
     if (options.m) {
@@ -73,9 +91,9 @@ class Frext implements FilenameFilter {
 
     // transform and output the result files in the directory
     if (options.v) {
-      log.info("(Frext.main): Processing result files from ${directory}...")
+      log.info("(Frext.main): Processing result files from ${inDir}...")
     }
-    def procCount = frext.processDirs(frextFormatter, directory)
+    def procCount = frext.processDirs(frextFormatter, inDir)
     if (options.v)
       log.info("(Frext.main): Processed ${procCount} results.")
   }
@@ -188,7 +206,7 @@ class Frext implements FilenameFilter {
     docs2Files.each { docId, docInfoMap ->
       def validTfMap = validateFiles(directory, docInfoMap.basename, docInfoMap.tfMap)
       if (validTfMap) {
-        cnt += frextFormatter.convert(directory, docId, validTfMap)
+        cnt += frextFormatter.transform(directory, docId, validTfMap)
       }
     }
     return cnt

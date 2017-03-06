@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Update for this class rename and removal of loader class.
+ *   Last Modified: Begin rewriting i/o translation.
  */
 class FrextFormatter {
 
@@ -21,12 +21,12 @@ class FrextFormatter {
 
 
   /** Transform a single doc set from the given directory to a new JSON format. */
-  def convert (directory, docId, tfMap) {
-    log.trace("(FrextFormatter.convert): dir=${directory}, docId=${docId}, tfMap=${tfMap}")
+  def transform (directory, docId, tfMap) {
+    log.trace("(FrextFormatter.transform): dir=${directory}, docId=${docId}, tfMap=${tfMap}")
 
     // read JSON files into data structures:
     def jsonSlurper = new JsonSlurper(type: JsonParserType.INDEX_OVERLAY)
-    def tjMap = tfMap.collectEntries { docType, filename ->
+    def friesMap = tfMap.collectEntries { docType, filename ->
       def fRdr = new FileReader(new File(directory, filename))
       def json = jsonSlurper.parse(fRdr)
       if (json)                             // if JSON was parsed from file
@@ -35,34 +35,31 @@ class FrextFormatter {
     }
 
     // extract relevant information from the data structures:
-    tjMap['sentences'] = extractSentenceTexts(tjMap)  // must be extracted before others
-    tjMap['entities']  = extractEntityMentions(tjMap) // must be extracted before events
-    tjMap['events']    = extractEventMentions(tjMap)
+    friesMap['sentences'] = extractSentenceTexts(friesMap)  // must be extracted before others
+    friesMap['entities']  = extractEntityMentions(friesMap) // must be extracted before events
+    friesMap['events']    = extractEventMentions(friesMap)
 
-    // convert one JSON format to another and output the events:
-    def cnt = 0
-    convertJson(docId, tjMap).each { event ->
-      def jsonEvent = JsonOutput.toJson(event)
-      if (jsonEvent) {
-        def status = outputEvent(docId, jsonEvent)
-        if (status)
-          cnt += 1
-      }
-    }
-    return cnt                              // return number of events added
+    // build a new document with the information extracted from the FRIES format
+    def outDoc = getMetaData(docId, friesMap)
+    outDoc['events'] = getEvents(docId, friesMap)
+    outputDocument(docId, outDoc)
+    return 1
   }
 
+  /** Begin the output document for a single paper by adding any metadata. */
+  def getMetaData (docId, friesMap) {
+    return [ "docId": docId ]               // TODO: ADD MORE METADATA LATER?
+  }
 
-  /** Create and return new JSON from the given type-to-json map for the specified document. */
-  def convertJson (docId, tjMap) {
-    log.trace("(FrextFormatter.convertJson): docId=${docId}, tjMap=${tjMap}")
-    def convertedEvents = []
-    tjMap.events.each { id, event ->
-      def evType = event.type ?: 'UNKNOWN'
-      def newEvents = convertEvent(docId, tjMap, event)  // can be 1->N
-      newEvents.each { convertedEvents << it }
+  /** Create and return a list of events information extracted from the given paper. */
+  def getEvents (docId, friesMap) {
+    log.trace("(FrextFormatter.getEvents): docId=${docId}")
+    def outEvents = []
+    friesMap.events.each { id, event ->
+      def newEvents = transformEvent(docId, friesMap, event)  // can be 1->N
+      newEvents.each { outEvents << it }
     }
-    return convertedEvents
+    return outEvents
   }
 
 
@@ -70,46 +67,51 @@ class FrextFormatter {
    *  using the given document ID, map of document sentence texts, and map of document
    *  child texts (from controlled event mentions).
    */
-  def convertEvent (docId, tjMap, event) {
-    log.trace("(FrextFormatter.convertEvent): docId=${docId}, event=${event}")
+  def transformEvent (docId, friesMap, event) {
+    log.trace("(FrextFormatter.transformEvent): docId=${docId}, event=${event}")
 
     def newEvents = []                      // list of new events created here
 
     // properties for the predicate portion of the output format
     def evType = event.type
     def predMap = ['type': evType]
-    if (event?.subtype) predMap['subtype'] = event.subtype
-    if (event?.regtype) predMap['regtype'] = event.regtype
+    if (event?.subtype) predMap['sub_type'] = event.subtype
+    if (event?.regtype) predMap['regulation_type'] = event.regtype
     if (event?.sign) predMap['sign'] = event.sign
-    if (event?.rule) predMap <<  ['rule': event.rule]
-
-    // properties for the location portion of the output format
-    def locMap = [:]
-    if (event?.sentence) locMap <<  ['sentence': event.sentence]
+    // if (event?.rule) predMap <<  ['rule': event.rule]
 
     // handle activation or regulation
     if ((evType == 'activation') || (evType == 'regulation')) {
-      def patient = getControlled(tjMap, event)
-      if (patient && patient?.subtype) {    // kludge: retrieve the controlled events subtype
-        predMap['subtype'] = patient.subtype // transfer it to the predicate where it belongs
-        patient.remove('subtype')          // delete it from the patient where it was stashed
+      def patient = getControlled(friesMap, event)
+      if (patient && patient?.subtype) {      // kludge: retrieve the controlled events subtype
+        predMap['sub_type'] = patient.subtype // transfer it to the predicate where it belongs
+        patient.remove('subtype')             // delete it from the patient where it was stashed
       }
-      def agents = getControllers(tjMap, event)
+      def agents = getControllers(friesMap, event)
       agents.each { agent ->
-        def evMap = ['docId': docId, 'p': predMap, 'a': agent, 'loc': locMap]
-        if (patient) evMap['t'] = patient
+        def evMap = [
+         'participant_a': agent,
+         'interaction_type': predMap,
+         'sentence': event.sentence ?: ''
+        ]
+        if (patient) evMap['participant_b'] = patient
         newEvents << evMap
       }
     }
 
     // handle complex-assembly (aka binding)
     else if (evType == 'complex-assembly') {
-      def themes = getThemes(tjMap, event)
+      predMap['type'] = 'binds'             // rename 'complex-assembly'
+      def themes = getThemes(friesMap, event)
       if (themes.size() == 2) {
-        newEvents << ['docId': docId, 'p': predMap, 'loc': locMap,
-                      'a': themes[0], 't': themes[1]]
-        newEvents << ['docId': docId, 'p': predMap, 'loc': locMap,
-                      'a': themes[1], 't': themes[0]]
+        newEvents << [ 'participant_a': themes[0],
+                       'participant_b': themes[1],
+                       'interaction_type': predMap,
+                       'sentence': event.sentence ?: '' ]
+        newEvents << [ 'participant_a': themes[1],
+                       'participant_b': themes[0],
+                       'interaction_type': predMap,
+                       'sentence': event.sentence ?: '' ]
       }
     }
 
@@ -117,12 +119,12 @@ class FrextFormatter {
   }
 
 
-  Map extractEntityMentions (tjMap) {
+  Map extractEntityMentions (friesMap) {
     log.trace("(FrextFormatter.extractEntityMentions):")
-    return tjMap.entities.frames.collectEntries { frame ->
+    return friesMap.entities.frames.collectEntries { frame ->
       if (frame['frame-type'] == 'entity-mention') {
         def frameId = frame['frame-id']
-        def frameMap = [ 'eText': frame['text'], 'eType': frame['type'] ]
+        def frameMap = [ 'entity_text': frame['text'], 'entity_type': frame['type'] ]
         def frameXrefs = frame['xrefs']
         if (frameXrefs) {
           def namespaceInfo = extractNamespaceInfo(frame.xrefs)
@@ -138,21 +140,22 @@ class FrextFormatter {
   def extractNamespaceInfo (xrefList) {
     return xrefList.findResults { xref ->
       if (xref)                             // ignore (bad) empty xrefs (?)
-        [ 'eNs': xref['namespace'], 'eId': xref['id'] ]
+        // [ 'ns': xref['namespace'], 'id': xref['id'] ]
+        [ 'identifier': (xref['namespace'] + ':' + xref['id']) ]
     }
   }
 
 
-  Map extractEventMentions (tjMap) {
+  Map extractEventMentions (friesMap) {
     log.trace("(FrextFormatter.extractEventMentions):")
-    return tjMap.events.frames.collectEntries { frame ->
+    return friesMap.events.frames.collectEntries { frame ->
       def frameId = frame['frame-id']
       def frameMap = [ 'id': frameId, 'type': frame['type'] ]
       if (frame?.subtype) frameMap['subtype'] = frame.subtype
       if ((frame.type == 'activation') || (frame.type == 'regulation'))
         frameMap['sign'] = extractSign(frame)
       if (frame['found-by']) frameMap['rule'] = frame['found-by']
-      def sentence = lookupSentence(tjMap, frame?.sentence)
+      def sentence = lookupSentence(friesMap, frame?.sentence)
       if (sentence) frameMap['sentence'] = sentence
       frameMap['args'] = extractArgInfo(frame.arguments)
       [ (frameId): frameMap ]
@@ -184,9 +187,9 @@ class FrextFormatter {
   }
 
   /** Return a map of frameId to sentence text for all sentences in the given doc map. */
-  Map extractSentenceTexts (tjMap) {
+  Map extractSentenceTexts (friesMap) {
     log.trace("(FrextFormatter.extractSentenceTexts):")
-    return tjMap.sentences.frames.collectEntries { frame ->
+    return friesMap.sentences.frames.collectEntries { frame ->
       if (frame['frame-type'] == 'sentence')
         [ (frame['frame-id']): frame['text'] ]
       else [:]
@@ -206,22 +209,22 @@ class FrextFormatter {
   }
 
   /** Return a list of entity maps from the arguments in the given event arguments list. */
-  def derefEntities (tjMap, argsList) {
+  def derefEntities (friesMap, argsList) {
     argsList.findResults { arg ->
-      lookupEntity(tjMap, getEntityXref(arg))
+      lookupEntity(friesMap, getEntityXref(arg))
     }
   }
 
   /** Return an entity map from the given entity argument map. */
-  def derefEntity (tjMap, arg) {
+  def derefEntity (friesMap, arg) {
     if (!arg) return null                   // sanity check
-    lookupEntity(tjMap, getEntityXref(arg))
+    lookupEntity(friesMap, getEntityXref(arg))
   }
 
   /** Return an event map from the given event argument map. */
-  def derefEvent (tjMap, arg) {
+  def derefEvent (friesMap, arg) {
     if (!arg) return null                   // sanity check
-    lookupEvent(tjMap, getEventXref(arg))
+    lookupEvent(friesMap, getEventXref(arg))
   }
 
   /** Check that the given argument map refers to an entity and return the
@@ -239,42 +242,42 @@ class FrextFormatter {
   }
 
   /** Return a controlled entity map from the controlled argument of the given event. */
-  def getControlled (tjMap, event) {
+  def getControlled (friesMap, event) {
     log.trace("(getControlled): event=${event}")
     def ctrld = getArgByRole(event, 'controlled') // should be just 1 controller arg
     if (!ctrld) return null                       // nothing controlled: exit out now
     if (ctrld.argType == 'event') {               // if it has a controlled (nested) event
-      def ctrldEvent = derefEvent(tjMap, ctrld)   // get the nested event
+      def ctrldEvent = derefEvent(friesMap, ctrld)   // get the nested event
       if (!ctrldEvent) return null                // bad nesting: exit out now
-      def ctrldEntity = getThemes(tjMap, ctrldEvent)?.getAt(0) // should be just 1 theme arg
+      def ctrldEntity = getThemes(friesMap, ctrldEvent)?.getAt(0) // should be just 1 theme arg
       if (!ctrldEntity) return null               // bad nesting: exit out now
       if (ctrldEvent?.subtype)                    // stash the controlled event subtype
         ctrldEntity['subtype'] = ctrldEvent.subtype // and return it in the entity
       return ctrldEntity                    // return the nested entity
     }
     else                                    // else it is a directly controlled entity
-      return derefEntity(tjMap, ctrld)
+      return derefEntity(friesMap, ctrld)
   }
 
   /** Return a list of controller entity maps from the controller argument of the given event. */
-  def getControllers (tjMap, event) {
+  def getControllers (friesMap, event) {
     log.trace("(getControllers): event=${event}")
     def ctlr = getArgByRole(event, 'controller') // should be just 1 controller arg
     if (ctlr)  {
       if (ctlr.argType == 'complex') {
         def themeRefs = getXrefsByPrefix(ctlr?.xrefs, 'theme')
-        return themeRefs.findResults { xref -> lookupEntity(tjMap, xref) }
+        return themeRefs.findResults { xref -> lookupEntity(friesMap, xref) }
       }
       else                                  // else it is a single controller event
-        return derefEntities(tjMap, [ctlr])
+        return derefEntities(friesMap, [ctlr])
     }
   }
 
   /** Return a list of theme entity maps from the theme arguments of the given event. */
-  def getThemes (tjMap, event) {
+  def getThemes (friesMap, event) {
     log.trace("(getThemes): event=${event}")
     def themeArgs = getArgsByRole(event, 'theme')
-    return derefEntities(tjMap, themeArgs)
+    return derefEntities(friesMap, themeArgs)
   }
 
 
@@ -288,30 +291,40 @@ class FrextFormatter {
   }
 
   /** Return the entity map referenced by the given entity cross-reference or null. */
-  def lookupEntity (tjMap, xref) {
+  def lookupEntity (friesMap, xref) {
     if (!xref) return null                  // sanity check
-    return tjMap['entities'].get(xref)
+    return friesMap['entities'].get(xref)
   }
 
   /** Return the event map referenced by the given event cross-reference or null. */
-  def lookupEvent (tjMap, xref) {
+  def lookupEvent (friesMap, xref) {
     if (!xref) return null                  // sanity check
-    return tjMap['events'].get(xref)
+    return friesMap['events'].get(xref)
   }
 
   /** Return a map of salient properties from the given entity cross-reference. */
-  def lookupSentence (tjMap, sentXref) {
+  def lookupSentence (friesMap, sentXref) {
     if (!sentXref) return null              // propogate null
-    return tjMap['sentences'].get(sentXref)
+    return friesMap['sentences'].get(sentXref)
   }
 
   /** Output the given document. */
-  def outputDoc (String docId, String jsonDocStr) {
-    log.trace("(FrextFormatter.outputDoc): docId=${docId}, doc=${jsonDocStr}")
-    // TODO: IMPLEMENT LATER
-    println("Outputting from $docId:")           // REMOVE LATER
-    println(jsonDocStr)                          // REMOVE LATER
+  def outputDocument (String docId, Map document) {
+    log.trace("(FrextFormatter.outputDocument): docId=${docId}")
+    def jsonDoc = JsonOutput.prettyPrint(JsonOutput.toJson(document))
+    // TODO: IMPLEMENT FILE OUTPUT LATER
+    println(jsonDoc)                        // REMOVE LATER
     return true
   }
+
+  //   convertJson(docId, friesMap).each { event ->
+  //     def jsonEvent = JsonOutput.toJson(event)
+  //     if (jsonEvent) {
+  //       def status = outputEvent(docId, jsonEvent)
+  //       if (status)
+  //         cnt += 1
+  //     }
+  //   }
+  //   return cnt                              // return number of events added
 
 }
