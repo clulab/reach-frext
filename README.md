@@ -1,4 +1,4 @@
-## Fries Output Converter and Reach Results Loader
+## Fries Output to Biopax Converter
 
 This is a public code repository of the Computational Language Understanding (CLU) Lab led by [Mihai Surdeanu](http://surdeanu.info/mihai/) at [University of Arizona](http://www.arizona.edu).
 

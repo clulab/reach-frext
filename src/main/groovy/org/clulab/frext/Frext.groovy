@@ -13,7 +13,7 @@ import groovy.util.CliBuilder
  * a format, ingestable by an OHSU Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Initial port of infrastructure.
+ *   Last Modified: Clean leftover arg processing.
  */
 class Frext implements FilenameFilter {
 
@@ -32,7 +32,7 @@ class Frext implements FilenameFilter {
   /** Main program entry point. */
   public static void main (String[] args) {
     // read, parse, and validate command line arguments
-    def usage = 'frext [-h] [-b N] [-m] [-c clusterName] [-i indexName] [-t typeName] directory'
+    def usage = 'frext [-h] [-m] [-v] directory'
     def cli = new CliBuilder(usage: usage)
     cli.width = 100                         // increase usage message width
     cli.with {
@@ -73,17 +73,11 @@ class Frext implements FilenameFilter {
     def frextFormer = new FrextFormer(settings, frextLoader)
 
     // transform and load the result files in the directory
-    def viaBulk = (settings.bulkLoad) ? 'Bulk ' : ''
     if (options.v) {
-      if (settings.bulkLoad) {
-        def bC = settings.bulkConcurrency
-        log.info("(Frext.main): Bulk Processing [main + ${bC} concurrent] result files from ${directory}...")
-      }
-      else
-        log.info("(Frext.main): Processing result files from ${directory}...")
+      log.info("(Frext.main): Processing result files from ${directory}...")
     }
     def procCount = frext.processDirs(frextFormer, directory)
-    frextLoader.exit()                      // cleanup elastic node
+    frextLoader.exit()                      // cleanup loader node
     if (options.v)
       log.info("(Frext.main): Processed ${procCount} results.")
   }

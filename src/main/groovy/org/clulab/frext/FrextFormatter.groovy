@@ -1,34 +1,34 @@
-package org.clulab.friolo
+package org.clulab.frext
 
 import org.apache.logging.log4j.*
 import groovy.json.*
 
 /**
- * Class to transform and load REACH results files, in Fries Output JSON format, into a
- * format more suitable for searching entity and event interconnections via ElasticSearch.
- *   Written by: Tom Hicks. 9/10/2015.
- *   Last Modified: Rename event subtype field.
+ * Class to transform and load REACH results files, in FRIES output JSON format, into a
+ * format more suitable for loading into a Biopax program.
+ *
+ *   Written by: Tom Hicks. 3/5/2017.
+ *   Last Modified: Initial port of infrastructure.
  */
-class FrioFormer {
+class FrextFormer {
 
-  static final Logger log = LogManager.getLogger(FrioFormer.class.getName());
+  static final Logger log = LogManager.getLogger(FrextFormer.class.getName());
 
   static final List INTERESTING_TYPES = ['activation', 'complex-assembly', 'regulation']
 
-  // the provided instance of a class to load events into ElasticSearch
-  public FrioLoader LOADER
+  // the provided instance of a class to load events
+  public FrextLoader LOADER
 
-  /** Public constructor taking a map of ingest option and an ElasticSearch loader class. */
-  public FrioFormer (options, frioLoader) {
-    log.trace("(FrioFormer.init): options=${options}, frioLoader=${frioLoader}")
-    LOADER = frioLoader
+  /** Public constructor taking a map of ingest option and a loader class. */
+  public FrextFormer (options, frextLoader) {
+    log.trace("(FrextFormer.init): options=${options}, frextLoader=${frextLoader}")
+    LOADER = frextLoader
   }
 
 
-  /** Transform a single doc set from the given directory to a new JSON format
-      and load it into an ElasticSearch engine. */
+  /** Transform a single doc set from the given directory to a new JSON format. */
   def convert (directory, docId, tfMap) {
-    log.trace("(FrioFormer.convert): dir=${directory}, docId=${docId}, tfMap=${tfMap}")
+    log.trace("(FrextFormer.convert): dir=${directory}, docId=${docId}, tfMap=${tfMap}")
 
     // read JSON files into data structures:
     def jsonSlurper = new JsonSlurper(type: JsonParserType.INDEX_OVERLAY)
@@ -50,7 +50,7 @@ class FrioFormer {
     convertJson(docId, tjMap).each { event ->
       def jsonDocStr = JsonOutput.toJson(event)
       if (jsonDocStr) {
-        def status = LOADER.addToIndex(jsonDocStr)
+        def status = LOADER.outputDoc(jsonDocStr)
         if (status)
           cnt += 1
       }
@@ -61,7 +61,7 @@ class FrioFormer {
 
   /** Create and return new JSON from the given type-to-json map for the specified document. */
   def convertJson (docId, tjMap) {
-    log.trace("(FrioFormer.convertJson): docId=${docId}, tjMap=${tjMap}")
+    log.trace("(FrextFormer.convertJson): docId=${docId}, tjMap=${tjMap}")
     def convertedEvents = []
     tjMap.events.each { id, event ->
       def evType = event.type ?: 'UNKNOWN'
@@ -79,7 +79,7 @@ class FrioFormer {
    *  child texts (from controlled event mentions).
    */
   def convertEvent (docId, tjMap, event) {
-    log.trace("(FrioFormer.convertEvent): docId=${docId}, event=${event}")
+    log.trace("(FrextFormer.convertEvent): docId=${docId}, event=${event}")
 
     def newEvents = []                      // list of new events created here
 
@@ -126,7 +126,7 @@ class FrioFormer {
 
 
   Map extractEntityMentions (tjMap) {
-    log.trace("(FrioFormer.extractEntityMentions):")
+    log.trace("(FrextFormer.extractEntityMentions):")
     return tjMap.entities.frames.collectEntries { frame ->
       if (frame['frame-type'] == 'entity-mention') {
         def frameId = frame['frame-id']
@@ -152,7 +152,7 @@ class FrioFormer {
 
 
   Map extractEventMentions (tjMap) {
-    log.trace("(FrioFormer.extractEventMentions):")
+    log.trace("(FrextFormer.extractEventMentions):")
     return tjMap.events.frames.collectEntries { frame ->
       def frameId = frame['frame-id']
       def frameMap = [ 'id': frameId, 'type': frame['type'] ]
@@ -193,7 +193,7 @@ class FrioFormer {
 
   /** Return a map of frameId to sentence text for all sentences in the given doc map. */
   Map extractSentenceTexts (tjMap) {
-    log.trace("(FrioFormer.extractSentenceTexts):")
+    log.trace("(FrextFormer.extractSentenceTexts):")
     return tjMap.sentences.frames.collectEntries { frame ->
       if (frame['frame-type'] == 'sentence')
         [ (frame['frame-id']): frame['text'] ]
