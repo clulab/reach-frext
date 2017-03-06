@@ -4,31 +4,25 @@ import org.apache.logging.log4j.*
 import groovy.json.*
 
 /**
- * Class to transform and load REACH results files, in FRIES output JSON format, into a
+ * Class to transform REACH results files, in FRIES output JSON format, into a
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Initial port of infrastructure.
+ *   Last Modified: Update for this class rename and removal of loader class.
  */
-class FrextFormer {
+class FrextFormatter {
 
-  static final Logger log = LogManager.getLogger(FrextFormer.class.getName());
+  static final Logger log = LogManager.getLogger(FrextFormatter.class.getName());
 
-  static final List INTERESTING_TYPES = ['activation', 'complex-assembly', 'regulation']
-
-  // the provided instance of a class to load events
-  public FrextLoader LOADER
-
-  /** Public constructor taking a map of ingest option and a loader class. */
-  public FrextFormer (options, frextLoader) {
-    log.trace("(FrextFormer.init): options=${options}, frextLoader=${frextLoader}")
-    LOADER = frextLoader
+  /** Public constructor taking a map of ingest option. */
+  public FrextFormatter (options) {
+    log.trace("(FrextFormatter.init): options=${options}")
   }
 
 
   /** Transform a single doc set from the given directory to a new JSON format. */
   def convert (directory, docId, tfMap) {
-    log.trace("(FrextFormer.convert): dir=${directory}, docId=${docId}, tfMap=${tfMap}")
+    log.trace("(FrextFormatter.convert): dir=${directory}, docId=${docId}, tfMap=${tfMap}")
 
     // read JSON files into data structures:
     def jsonSlurper = new JsonSlurper(type: JsonParserType.INDEX_OVERLAY)
@@ -45,12 +39,12 @@ class FrextFormer {
     tjMap['entities']  = extractEntityMentions(tjMap) // must be extracted before events
     tjMap['events']    = extractEventMentions(tjMap)
 
-    // convert one JSON format to another and load the events:
+    // convert one JSON format to another and output the events:
     def cnt = 0
     convertJson(docId, tjMap).each { event ->
-      def jsonDocStr = JsonOutput.toJson(event)
-      if (jsonDocStr) {
-        def status = LOADER.outputDoc(jsonDocStr)
+      def jsonEvent = JsonOutput.toJson(event)
+      if (jsonEvent) {
+        def status = outputEvent(docId, jsonEvent)
         if (status)
           cnt += 1
       }
@@ -61,14 +55,12 @@ class FrextFormer {
 
   /** Create and return new JSON from the given type-to-json map for the specified document. */
   def convertJson (docId, tjMap) {
-    log.trace("(FrextFormer.convertJson): docId=${docId}, tjMap=${tjMap}")
+    log.trace("(FrextFormatter.convertJson): docId=${docId}, tjMap=${tjMap}")
     def convertedEvents = []
     tjMap.events.each { id, event ->
       def evType = event.type ?: 'UNKNOWN'
-      if (evType in INTERESTING_TYPES) {
-        def newEvents = convertEvent(docId, tjMap, event)  // can be 1->N
-        newEvents.each { convertedEvents << it }
-      }
+      def newEvents = convertEvent(docId, tjMap, event)  // can be 1->N
+      newEvents.each { convertedEvents << it }
     }
     return convertedEvents
   }
@@ -79,7 +71,7 @@ class FrextFormer {
    *  child texts (from controlled event mentions).
    */
   def convertEvent (docId, tjMap, event) {
-    log.trace("(FrextFormer.convertEvent): docId=${docId}, event=${event}")
+    log.trace("(FrextFormatter.convertEvent): docId=${docId}, event=${event}")
 
     def newEvents = []                      // list of new events created here
 
@@ -126,7 +118,7 @@ class FrextFormer {
 
 
   Map extractEntityMentions (tjMap) {
-    log.trace("(FrextFormer.extractEntityMentions):")
+    log.trace("(FrextFormatter.extractEntityMentions):")
     return tjMap.entities.frames.collectEntries { frame ->
       if (frame['frame-type'] == 'entity-mention') {
         def frameId = frame['frame-id']
@@ -152,7 +144,7 @@ class FrextFormer {
 
 
   Map extractEventMentions (tjMap) {
-    log.trace("(FrextFormer.extractEventMentions):")
+    log.trace("(FrextFormatter.extractEventMentions):")
     return tjMap.events.frames.collectEntries { frame ->
       def frameId = frame['frame-id']
       def frameMap = [ 'id': frameId, 'type': frame['type'] ]
@@ -193,7 +185,7 @@ class FrextFormer {
 
   /** Return a map of frameId to sentence text for all sentences in the given doc map. */
   Map extractSentenceTexts (tjMap) {
-    log.trace("(FrextFormer.extractSentenceTexts):")
+    log.trace("(FrextFormatter.extractSentenceTexts):")
     return tjMap.sentences.frames.collectEntries { frame ->
       if (frame['frame-type'] == 'sentence')
         [ (frame['frame-id']): frame['text'] ]
@@ -311,6 +303,15 @@ class FrextFormer {
   def lookupSentence (tjMap, sentXref) {
     if (!sentXref) return null              // propogate null
     return tjMap['sentences'].get(sentXref)
+  }
+
+  /** Output the given document. */
+  def outputDoc (String docId, String jsonDocStr) {
+    log.trace("(FrextFormatter.outputDoc): docId=${docId}, doc=${jsonDocStr}")
+    // TODO: IMPLEMENT LATER
+    println("Outputting from $docId:")           // REMOVE LATER
+    println(jsonDocStr)                          // REMOVE LATER
+    return true
   }
 
 }

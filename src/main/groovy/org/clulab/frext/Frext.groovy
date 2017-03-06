@@ -13,7 +13,7 @@ import groovy.util.CliBuilder
  * a format, ingestable by an OHSU Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Clean leftover arg processing.
+ *   Last Modified: Update for formatter class rename and removal of loader class.
  */
 class Frext implements FilenameFilter {
 
@@ -55,7 +55,7 @@ class Frext implements FilenameFilter {
     File directory = frext.goodDirPath(options.arguments()[0])
     if (!directory) return                  // problem with directory: exit out now
 
-    // create loader with the specified settings and begin to load files
+    // map settings and begin to load files
     def settings = [ 'mapFilenames': options.m ?: false,
                      'verbose': options.v ?: false ]
 
@@ -68,16 +68,14 @@ class Frext implements FilenameFilter {
         log.info("(Frext.main): Read ${mCnt} filename mappings.")
     }
 
-    // create instance of loader class, passing it to new instance of transformer class:
-    def frextLoader = new FrextLoader(settings)
-    def frextFormer = new FrextFormer(settings, frextLoader)
+    // create instance of formatter class, passing it the global settings
+    def frextFormatter = new FrextFormatter(settings)
 
-    // transform and load the result files in the directory
+    // transform and output the result files in the directory
     if (options.v) {
       log.info("(Frext.main): Processing result files from ${directory}...")
     }
-    def procCount = frext.processDirs(frextFormer, directory)
-    frextLoader.exit()                      // cleanup loader node
+    def procCount = frext.processDirs(frextFormatter, directory)
     if (options.v)
       log.info("(Frext.main): Processed ${procCount} results.")
   }
@@ -172,25 +170,25 @@ class Frext implements FilenameFilter {
   }
 
   /** Process the files in all subdirectories of the given top-level directory. */
-  def processDirs (frextFormer, topDirectory) {
-    int cnt = processFiles(frextFormer, topDirectory)
+  def processDirs (frextFormatter, topDirectory) {
+    int cnt = processFiles(frextFormatter, topDirectory)
     topDirectory.eachDirRecurse { dir ->
       if (goodDirectory(dir)) {
-        cnt += processFiles(frextFormer, dir)
+        cnt += processFiles(frextFormatter, dir)
       }
     }
     return cnt
   }
 
   /** Read, aggregate and transform the results in the named REACH result files. */
-  def processFiles (frextFormer, directory) {
-    log.trace("(Frext.processFiles): xformer=${frextFormer}, dir=${directory}")
+  def processFiles (frextFormatter, directory) {
+    log.trace("(Frext.processFiles): formatter=${frextFormatter}, dir=${directory}")
     int cnt = 0
     def docs2Files = mapDocsToFiles(directory)
     docs2Files.each { docId, docInfoMap ->
       def validTfMap = validateFiles(directory, docInfoMap.basename, docInfoMap.tfMap)
       if (validTfMap) {
-        cnt += frextFormer.convert(directory, docId, validTfMap)
+        cnt += frextFormatter.convert(directory, docId, validTfMap)
       }
     }
     return cnt
