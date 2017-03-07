@@ -8,15 +8,18 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Expand remaining event types.
+ *   Last Modified: Implement individual file output.
  */
 class FrextFormatter {
 
   static final Logger log = LogManager.getLogger(FrextFormatter.class.getName());
 
-  /** Public constructor taking a map of ingest option. */
-  public FrextFormatter (options) {
-    log.trace("(FrextFormatter.init): options=${options}")
+  Map settings                              // class global settings
+
+  /** Public constructor taking a map of program settings. */
+  public FrextFormatter (settings) {
+    log.trace("(FrextFormatter.init): settings=${settings}")
+    this.settings = settings                // save incoming settings in global variable
   }
 
 
@@ -369,23 +372,13 @@ class FrextFormatter {
     return friesMap['sentences'].get(sentXref)
   }
 
-  /** Output the given document. */
+  /** Output the given document to a file in the output directory given in settings. */
   def outputDocument (String docId, Map document) {
     log.trace("(FrextFormatter.outputDocument): docId=${docId}")
     def jsonDoc = JsonOutput.prettyPrint(JsonOutput.toJson(document))
-    // TODO: IMPLEMENT FILE OUTPUT LATER
-    println(jsonDoc)                        // REMOVE LATER
+    def outFile = new File(settings.outDir, docId + '.json')
+    outFile.withWriter('UTF-8') { it.write(jsonDoc) }
     return true
   }
-
-  //   convertJson(docId, friesMap).each { event ->
-  //     def jsonEvent = JsonOutput.toJson(event)
-  //     if (jsonEvent) {
-  //       def status = outputEvent(docId, jsonEvent)
-  //       if (status)
-  //         cnt += 1
-  //     }
-  //   }
-  //   return cnt                              // return number of events added
 
 }

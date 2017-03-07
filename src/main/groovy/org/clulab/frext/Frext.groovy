@@ -13,7 +13,7 @@ import groovy.util.CliBuilder
  * a format, ingestable by an OHSU Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Add output directory option.
+ *   Last Modified: Pass output-directory file in settings.
  */
 class Frext implements FilenameFilter {
 
@@ -71,7 +71,7 @@ class Frext implements FilenameFilter {
 
     // map settings and begin to load files
     def settings = [ 'mapFilenames': options.m ?: false,
-                     'outDir': options.o ?: '.',
+                     'outDir': outDir,
                      'verbose': options.v ?: false ]
 
     if (options.v)
