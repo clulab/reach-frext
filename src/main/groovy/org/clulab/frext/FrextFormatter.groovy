@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Read entity modifications. Redo translocation arguments.
+ *   Last Modified: Fix: wrong sign extract algorithm.
  */
 class FrextFormatter {
 
@@ -77,10 +77,11 @@ class FrextFormatter {
 
     // properties for the predicate portion of the output format
     def evType = event.type
-    def predMap = ['type': evType]
-    if (event?.subtype) predMap['sub_type'] = event.subtype
-    if (event?.regtype) predMap['regulation_type'] = event.regtype
-    if (event?.sign) predMap['sign'] = event.sign
+    def predMap = [ 'type': evType, 'sign': event.sign ]
+    if (event['subtype']) predMap['sub_type'] = event.subtype
+    if (event['regtype']) predMap['regulation_type'] = event.regtype
+    if (event['is-direct']) predMap['is-direct'] = true
+    if (event.sign == 'negative') predMap['negative_information'] = true
     // if (event?.rule) predMap <<  ['rule': event.rule]
 
     // handle activation or regulation
@@ -220,10 +221,10 @@ class FrextFormatter {
     log.trace("(FrextFormatter.extractEventMentions):")
     return friesMap.events.frames.collectEntries { frame ->
       def frameId = frame['frame-id']
-      def frameMap = [ 'id': frameId, 'type': frame['type'] ]
-      if (frame?.subtype) frameMap['subtype'] = frame.subtype
-      if ((frame.type == 'activation') || (frame.type == 'regulation'))
-        frameMap['sign'] = extractSign(frame)
+      def frameMap = [ 'id': frameId, 'type': frame['type'],
+                       'sign': extractSign(frame) ]  // added field
+      if (frame['subtype']) frameMap['subtype'] = frame.subtype
+      if (frame['is-direct']) frameMap['is-direct'] = true
       if (frame['found-by']) frameMap['rule'] = frame['found-by']
       def sentence = lookupSentence(friesMap, frame?.sentence)
       if (sentence) frameMap['sentence'] = sentence
@@ -245,15 +246,10 @@ class FrextFormatter {
     }
   }
 
+  /** Test for the presence of the is-negated flag, indicating that something failed to happen. */
   def extractSign (frame) {
-    log.trace("(extractSign): frame=${frame?.subtype}")
-    if (frame && frame?.subtype) {
-      if (frame.subtype.startsWith('pos'))
-        return 'positive'
-      else if (frame.subtype.startsWith('neg'))
-        return 'negative'
-    }
-    return 'UNKNOWN'                        // signal failure: should never happen
+    log.trace("(extractSign): frame=${frame}")
+    return (frame && frame['is-negated']) ? 'negative' : 'positive'
   }
 
   /** Return a map of frameId to sentence text for all sentences in the given doc map. */
