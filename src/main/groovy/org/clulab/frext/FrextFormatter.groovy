@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Begin rewriting i/o translation.
+ *   Last Modified: Expand remaining event types.
  */
 class FrextFormatter {
 
@@ -89,11 +89,9 @@ class FrextFormatter {
       }
       def agents = getControllers(friesMap, event)
       agents.each { agent ->
-        def evMap = [
-         'participant_a': agent,
-         'interaction_type': predMap,
-         'sentence': event.sentence ?: ''
-        ]
+        def evMap = [ 'participant_a': agent,
+                      'interaction_type': predMap,
+                      'sentence': event.sentence ?: '' ]
         if (patient) evMap['participant_b'] = patient
         newEvents << evMap
       }
@@ -103,16 +101,65 @@ class FrextFormatter {
     else if (evType == 'complex-assembly') {
       predMap['type'] = 'binds'             // rename 'complex-assembly'
       def themes = getThemes(friesMap, event)
+      def sites = getSites(friesMap, event)
       if (themes.size() == 2) {
-        newEvents << [ 'participant_a': themes[0],
-                       'participant_b': themes[1],
-                       'interaction_type': predMap,
-                       'sentence': event.sentence ?: '' ]
-        newEvents << [ 'participant_a': themes[1],
-                       'participant_b': themes[0],
-                       'interaction_type': predMap,
-                       'sentence': event.sentence ?: '' ]
+        def aToB = [ 'participant_a': themes[0],
+                     'participant_b': themes[1],
+                     'interaction_type': predMap,
+                     'sentence': event.sentence ?: '' ]
+        if (sites) aToB['sites'] = sites
+        newEvents << aToB
+        def bToA = [ 'participant_a': themes[1],
+                     'participant_b': themes[0],
+                     'interaction_type': predMap,
+                     'sentence': event.sentence ?: '' ]
+        if (sites) bToA['sites'] = sites
+        newEvents << bToA
       }
+    }
+
+    // handle translocation
+    else if (evType == 'translocation') {
+      def fromArg = getThemes(friesMap, event)?.getAt(0) // should be just 1 theme arg
+      def destArg = getDestinations(friesMap, event)?.getAt(0) // should be just 1 dest arg
+      def sites = getSites(friesMap, event)
+      if (fromArg && destArg) {
+        def evMap = [ 'participant_a': fromArg,
+                      'participant_b': destArg,
+                      'interaction_type': predMap,
+                      'sentence': event.sentence ?: '' ]
+        if (sites) evMap['sites'] = sites
+        newEvents << evMap
+      }
+    }
+
+    // handle protein-modification
+    else if (evType == 'protein-modification') {
+      def themes = getThemes(friesMap, event)
+      def sites = getSites(friesMap, event)
+      if (themes) {
+        def evMap = [ 'participant_a': themes[0],
+                      'interaction_type': predMap,
+                      'sentence': event.sentence ?: '' ]
+        if (themes.size() > 1)
+          evMap << ['participant_b': themes[1]]
+        if (sites) evMap['sites'] = sites
+        newEvents << evMap
+      }
+    }
+
+    // handle everything else (is there anything else?)
+    else {
+      def sites = getSites(friesMap, event)
+      def args = (event.args) ? derefEntities(friesMap, event.args) : []
+      def evMap = [ 'interaction_type': predMap,
+                    'sentence': event.sentence ?: '' ]
+      if (args.size() > 0)
+        evMap << ['participant_a': args[0]]
+      if (args.size() > 1)
+        evMap << ['participant_b': args[1]]
+      if (sites) evMap['sites'] = sites
+      newEvents << evMap
     }
 
     return newEvents
@@ -273,7 +320,21 @@ class FrextFormatter {
     }
   }
 
-  /** Return a list of theme entity maps from the theme arguments of the given event. */
+  /** Return a list of entity maps from the destination arguments of the given event. */
+  def getDestinations (friesMap, event) {
+    log.trace("(getDestinations): event=${event}")
+    def destArgs = getArgsByRole(event, 'destination')
+    return derefEntities(friesMap, destArgs)
+  }
+
+  /** Return a list of entity maps from the site arguments of the given event. */
+  def getSites (friesMap, event) {
+    log.trace("(getSites): event=${event}")
+    def siteArgs = getArgsByRole(event, 'site')
+    return derefEntities(friesMap, siteArgs)
+  }
+
+  /** Return a list of entity maps from the theme arguments of the given event. */
   def getThemes (friesMap, event) {
     log.trace("(getThemes): event=${event}")
     def themeArgs = getArgsByRole(event, 'theme')
