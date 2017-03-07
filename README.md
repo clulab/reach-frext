@@ -1,11 +1,11 @@
-## Fries Output Extractor
+## Fries Results Extractor
 
 This is a public code repository of the Computational Language Understanding (CLU) Lab led by [Mihai Surdeanu](http://surdeanu.info/mihai/) at [University of Arizona](http://www.arizona.edu).
 
 Author: [Tom Hicks](https://github.com/hickst)
 
-Purpose: Converts triples of FRIES-format JSON files, containing Reach results, into a simpler
-format for use by various other programs.
+Purpose: Converts Reach results, contained in triples of FRIES-format JSON files,
+into a simpler, single output format for use by other programs.
 
 ## Installation
 
