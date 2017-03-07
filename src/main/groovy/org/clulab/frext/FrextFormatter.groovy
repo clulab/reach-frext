@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Implement individual file output.
+ *   Last Modified: Read entity modifications. Redo translocation arguments.
  */
 class FrextFormatter {
 
@@ -124,13 +124,15 @@ class FrextFormatter {
     // handle translocation
     else if (evType == 'translocation') {
       def fromArg = getThemes(friesMap, event)?.getAt(0) // should be just 1 theme arg
+      def srcArg = getSources(friesMap, event)?.getAt(0) // should be just 1 source arg
       def destArg = getDestinations(friesMap, event)?.getAt(0) // should be just 1 dest arg
       def sites = getSites(friesMap, event)
       if (fromArg && destArg) {
         def evMap = [ 'participant_a': fromArg,
-                      'participant_b': destArg,
+                      'to_location': destArg,
                       'interaction_type': predMap,
                       'sentence': event.sentence ?: '' ]
+        if (srcArg) evMap['from_location'] = srcArg
         if (sites) evMap['sites'] = sites
         newEvents << evMap
       }
@@ -181,9 +183,27 @@ class FrextFormatter {
           if (namespaceInfo)
             frameMap << namespaceInfo
         }
+        def frameMods = frame['modifications']
+        if (frameMods) {
+          def modsInfo = extractModificationInfo(frameMods)
+          if (modsInfo)
+            frameMap << [ 'modifications': modsInfo ]
+        }
         [ (frameId): frameMap ]
       }
       else [:]                              // else frame was not an entity mention
+    }
+  }
+
+  def extractModificationInfo (modList) {
+    return modList.findResults { mod ->
+      if (mod) {                            // ignore (bad) empty modifications (?)
+        def modMap = [ 'modification_type': mod['type'] ]
+        if (mod['evidence'])  modMap << [ 'evidence': mod['evidence'] ]
+        if (mod['negated'])  modMap << [ 'negated': mod['negated'] ]
+        if (mod['site'])  modMap << [ 'site': mod['site'] ]
+        modMap
+      }
     }
   }
 
@@ -335,6 +355,13 @@ class FrextFormatter {
     log.trace("(getSites): event=${event}")
     def siteArgs = getArgsByRole(event, 'site')
     return derefEntities(friesMap, siteArgs)
+  }
+
+  /** Return a list of entity maps from the source arguments of the given event. */
+  def getSources (friesMap, event) {
+    log.trace("(getSources): event=${event}")
+    def srcArgs = getArgsByRole(event, 'source')
+    return derefEntities(friesMap, srcArgs)
   }
 
   /** Return a list of entity maps from the theme arguments of the given event. */
