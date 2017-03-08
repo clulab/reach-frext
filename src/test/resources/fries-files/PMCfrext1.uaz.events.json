@@ -1,0 +1,94 @@
+{
+  "frames":[
+    {
+      "text":"AKT1 that is phosphorylated at T308 phosphorylates AKT1S1 at T246",
+      "frame-id":"evem-PMCfrext1-UAZ-r1-issue199-2-1",
+      "arguments":[
+        {
+          "text":"phosphorylates AKT1S1 at T246",
+          "argument-type":"event",
+          "type":"controlled",
+          "object-type":"argument",
+          "index":0,
+          "arg":"evem-PMCfrext1-UAZ-r1-issue199-2-2"
+        },
+        {
+          "text":"AKT1",
+          "argument-type":"entity",
+          "type":"controller",
+          "object-type":"argument",
+          "index":0,
+          "arg":"ment-PMCfrext1-UAZ-r1-issue199-2-3"
+        }
+      ],
+      "type":"regulation",
+      "frame-type":"event-mention",
+      "subtype":"positive-regulation",
+      "end-pos":{
+        "reference":"pass-PMCfrext1-UAZ-r1-issue199",
+        "offset":108,
+        "object-type":"relative-pos"
+      },
+      "object-type":"frame",
+      "start-pos":{
+        "reference":"pass-PMCfrext1-UAZ-r1-issue199",
+        "offset":43,
+        "object-type":"relative-pos"
+      },
+      "found-by":"Phosphorylation_syntax_1a_verb + toRelationMention",
+      "sentence":"sent-PMCfrext1-UAZ-r1-issue199-2",
+      "verbose-text":"The AKT1 that is phosphorylated at T308 phosphorylates AKT1S1 at T246."
+    },
+    {
+      "frame-id":"evem-PMCfrext1-UAZ-r1-issue199-2-2",
+      "text":"phosphorylates AKT1S1 at T246",
+      "arguments":[
+        {
+          "text":"T246",
+          "argument-type":"entity",
+          "type":"site",
+          "object-type":"argument",
+          "index":0,
+          "arg":"ment-PMCfrext1-UAZ-r1-issue199-2-1"
+        },
+        {
+          "text":"AKT1S1",
+          "argument-type":"entity",
+          "type":"theme",
+          "object-type":"argument",
+          "index":0,
+          "arg":"ment-PMCfrext1-UAZ-r1-issue199-2-2"
+        }
+      ],
+      "type":"protein-modification",
+      "frame-type":"event-mention",
+      "subtype":"phosphorylation",
+      "is-direct":true,
+      "end-pos":{
+        "reference":"pass-PMCfrext1-UAZ-r1-issue199",
+        "offset":108,
+        "object-type":"relative-pos"
+      },
+      "trigger":"phosphorylates",
+      "object-type":"frame",
+      "start-pos":{
+        "reference":"pass-PMCfrext1-UAZ-r1-issue199",
+        "offset":79,
+        "object-type":"relative-pos"
+      },
+      "sentence":"sent-PMCfrext1-UAZ-r1-issue199-2",
+      "found-by":"Phosphorylation_syntax_1a_verb",
+      "verbose-text":"The AKT1 that is phosphorylated at T308 phosphorylates AKT1S1 at T246."
+    }
+  ],
+  "object-type":"frame-collection",
+  "object-meta":{
+    "processing-end":"2017-03-08T02:19:10Z",
+    "doc-id":"PMCfrext1",
+    "component-type":"machine",
+    "component":"Reach",
+    "processing-start":"2017-03-08T02:19:09Z",
+    "object-type":"meta-info",
+    "organization":"UAZ"
+  }
+}
