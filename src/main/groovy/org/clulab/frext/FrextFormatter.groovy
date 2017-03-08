@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Fix: wrong sign extract algorithm.
+ *   Last Modified: Fix: modification participant. Rename field to predicate.
  */
 class FrextFormatter {
 
@@ -94,7 +94,7 @@ class FrextFormatter {
       def agents = getControllers(friesMap, event)
       agents.each { agent ->
         def evMap = [ 'participant_a': agent,
-                      'interaction_type': predMap,
+                      'predicate': predMap,
                       'sentence': event.sentence ?: '' ]
         if (patient) evMap['participant_b'] = patient
         newEvents << evMap
@@ -109,13 +109,13 @@ class FrextFormatter {
       if (themes.size() == 2) {
         def aToB = [ 'participant_a': themes[0],
                      'participant_b': themes[1],
-                     'interaction_type': predMap,
+                     'predicate': predMap,
                      'sentence': event.sentence ?: '' ]
         if (sites) aToB['sites'] = sites
         newEvents << aToB
         def bToA = [ 'participant_a': themes[1],
                      'participant_b': themes[0],
-                     'interaction_type': predMap,
+                     'predicate': predMap,
                      'sentence': event.sentence ?: '' ]
         if (sites) bToA['sites'] = sites
         newEvents << bToA
@@ -131,7 +131,7 @@ class FrextFormatter {
       if (fromArg && destArg) {
         def evMap = [ 'participant_a': fromArg,
                       'to_location': destArg,
-                      'interaction_type': predMap,
+                      'predicate': predMap,
                       'sentence': event.sentence ?: '' ]
         if (srcArg) evMap['from_location'] = srcArg
         if (sites) evMap['sites'] = sites
@@ -144,11 +144,10 @@ class FrextFormatter {
       def themes = getThemes(friesMap, event)
       def sites = getSites(friesMap, event)
       if (themes) {
-        def evMap = [ 'participant_a': themes[0],
-                      'interaction_type': predMap,
+        // a modification event will have exactly one theme
+        def evMap = [ 'participant_b': themes[0],
+                      'predicate': predMap,
                       'sentence': event.sentence ?: '' ]
-        if (themes.size() > 1)
-          evMap << ['participant_b': themes[1]]
         if (sites) evMap['sites'] = sites
         newEvents << evMap
       }
@@ -158,7 +157,7 @@ class FrextFormatter {
     else {
       def sites = getSites(friesMap, event)
       def args = (event.args) ? derefEntities(friesMap, event.args) : []
-      def evMap = [ 'interaction_type': predMap,
+      def evMap = [ 'predicate': predMap,
                     'sentence': event.sentence ?: '' ]
       if (args.size() > 0)
         evMap << ['participant_a': args[0]]
