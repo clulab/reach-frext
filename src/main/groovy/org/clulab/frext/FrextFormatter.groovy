@@ -81,6 +81,7 @@ class FrextFormatter {
     if (event['subtype']) predMap['sub_type'] = event.subtype
     if (event['regtype']) predMap['regulation_type'] = event.regtype
     if (event['is-direct']) predMap['is-direct'] = true
+    if (event['is-hypothesis']) predMap['is-hypothesis'] = true
     if (event.sign == 'negative') predMap['negative_information'] = true
     // if (event?.rule) predMap <<  ['rule': event.rule]
 
@@ -224,6 +225,7 @@ class FrextFormatter {
                        'sign': extractSign(frame) ]  // added field
       if (frame['subtype']) frameMap['subtype'] = frame.subtype
       if (frame['is-direct']) frameMap['is-direct'] = true
+      if (frame['is-hypothesis']) frameMap['is-hypothesis'] = true
       if (frame['found-by']) frameMap['rule'] = frame['found-by']
       def sentence = lookupSentence(friesMap, frame?.sentence)
       if (sentence) frameMap['sentence'] = sentence
