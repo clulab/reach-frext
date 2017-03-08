@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Fix: modification participant. Rename field to predicate.
+ *   Last Modified: Handle nested activations and regulations.
  */
 class FrextFormatter {
 
@@ -51,7 +51,7 @@ class FrextFormatter {
 
   /** Begin the output document for a single paper by adding any metadata. */
   def getMetaData (docId, friesMap) {
-    return [ "docId": docId ]               // TODO: ADD MORE METADATA LATER?
+    return [ "docId": docId ]
   }
 
   /** Create and return a list of events information extracted from the given paper. */
@@ -66,8 +66,8 @@ class FrextFormatter {
   }
 
 
-  /** Return a shallow, tuple-like map created by processing the given event
-   *  using the given document ID, map of document sentence texts, and map of document
+  /** Return a tuple-like map created by processing the given event using the
+   *  given document ID, map of document sentence texts, and map of document
    *  child texts (from controlled event mentions).
    */
   def transformEvent (docId, friesMap, event) {
@@ -77,7 +77,7 @@ class FrextFormatter {
 
     // properties for the predicate portion of the output format
     def evType = event.type
-    def predMap = [ 'type': evType, 'sign': event.sign ]
+    def predMap = [ 'type': evType, 'event_text': event.text, 'sign': event.sign ]
     if (event['subtype']) predMap['sub_type'] = event.subtype
     if (event['regtype']) predMap['regulation_type'] = event.regtype
     if (event['is-direct']) predMap['is-direct'] = true
@@ -85,13 +85,9 @@ class FrextFormatter {
     if (event.sign == 'negative') predMap['negative_information'] = true
     // if (event?.rule) predMap <<  ['rule': event.rule]
 
-    // handle activation or regulation
+    // handle any nested events in activation or regulation
     if ((evType == 'activation') || (evType == 'regulation')) {
-      def patient = getControlled(friesMap, event)
-      if (patient && patient?.subtype) {      // kludge: retrieve the controlled events subtype
-        predMap['sub_type'] = patient.subtype // transfer it to the predicate where it belongs
-        patient.remove('subtype')             // delete it from the patient where it was stashed
-      }
+      def patient = getControlled(docId, friesMap, event)
       def agents = getControllers(friesMap, event)
       agents.each { agent ->
         def evMap = [ 'participant_a': agent,
@@ -221,8 +217,10 @@ class FrextFormatter {
     log.trace("(FrextFormatter.extractEventMentions):")
     return friesMap.events.frames.collectEntries { frame ->
       def frameId = frame['frame-id']
-      def frameMap = [ 'id': frameId, 'type': frame['type'],
-                       'sign': extractSign(frame) ]  // added field
+      def frameMap = [ 'id': frameId,
+                       'type': frame['type'],
+                       'text': frame['text'],
+                       'sign': extractSign(frame) ]  // constructed field
       if (frame['subtype']) frameMap['subtype'] = frame.subtype
       if (frame['is-direct']) frameMap['is-direct'] = true
       if (frame['is-hypothesis']) frameMap['is-hypothesis'] = true
@@ -309,18 +307,14 @@ class FrextFormatter {
   }
 
   /** Return a controlled entity map from the controlled argument of the given event. */
-  def getControlled (friesMap, event) {
-    log.trace("(getControlled): event=${event}")
+  def getControlled (docId, friesMap, event) {
+    log.trace("(getControlled): docId=${docId}, event=${event}")
     def ctrld = getArgByRole(event, 'controlled') // should be just 1 controller arg
     if (!ctrld) return null                       // nothing controlled: exit out now
     if (ctrld.argType == 'event') {               // if it has a controlled (nested) event
       def ctrldEvent = derefEvent(friesMap, ctrld)   // get the nested event
       if (!ctrldEvent) return null                // bad nesting: exit out now
-      def ctrldEntity = getThemes(friesMap, ctrldEvent)?.getAt(0) // should be just 1 theme arg
-      if (!ctrldEntity) return null               // bad nesting: exit out now
-      if (ctrldEvent?.subtype)                    // stash the controlled event subtype
-        ctrldEntity['subtype'] = ctrldEvent.subtype // and return it in the entity
-      return ctrldEntity                    // return the nested entity
+      return transformEvent(docId, friesMap, ctrldEvent) // recurse to process nested event
     }
     else                                    // else it is a directly controlled entity
       return derefEntity(friesMap, ctrld)
