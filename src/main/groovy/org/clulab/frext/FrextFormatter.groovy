@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Handle nested activations and regulations.
+ *   Last Modified: Rename confusing variable to patient.
  */
 class FrextFormatter {
 
@@ -121,12 +121,12 @@ class FrextFormatter {
 
     // handle translocation
     else if (evType == 'translocation') {
-      def fromArg = getThemes(friesMap, event)?.getAt(0) // should be just 1 theme arg
+      def patient = getThemes(friesMap, event)?.getAt(0) // should be just 1 theme arg
       def srcArg = getSources(friesMap, event)?.getAt(0) // should be just 1 source arg
       def destArg = getDestinations(friesMap, event)?.getAt(0) // should be just 1 dest arg
       def sites = getSites(friesMap, event)
-      if (fromArg && destArg) {
-        def evMap = [ 'participant_a': fromArg,
+      if (patient && destArg) {
+        def evMap = [ 'participant_a': patient,
                       'to_location': destArg,
                       'predicate': predMap,
                       'sentence': event.sentence ?: '' ]
