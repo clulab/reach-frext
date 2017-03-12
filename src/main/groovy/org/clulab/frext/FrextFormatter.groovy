@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Rename confusing variable to patient.
+ *   Last Modified: Output unique event id.
  */
 class FrextFormatter {
 
@@ -77,7 +77,10 @@ class FrextFormatter {
 
     // properties for the predicate portion of the output format
     def evType = event.type
-    def predMap = [ 'type': evType, 'event_text': event.text, 'sign': event.sign ]
+    def predMap = [ 'id': event.id,
+                    'type': evType,
+                    'event_text': event.text,
+                    'sign': event.sign ]
     if (event['subtype']) predMap['sub_type'] = event.subtype
     if (event['regtype']) predMap['regulation_type'] = event.regtype
     if (event['is-direct']) predMap['is-direct'] = true
