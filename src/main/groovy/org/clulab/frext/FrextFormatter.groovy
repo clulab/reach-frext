@@ -8,11 +8,73 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Output unique event id.
+ *   Last Modified: Begin heuristics to deconstruct site text.
  */
 class FrextFormatter {
 
   static final Logger log = LogManager.getLogger(FrextFormatter.class.getName());
+
+  static final Set AminoAcidNames = [
+    'alanine', 'arginine', 'asparagine', 'aspartic acid', 'aspartate',
+    'cysteine', 'glutamic acid', 'glutamate', 'glutamine', 'glycine',
+    'histidine', 'isoleucine', 'leucine', 'lysine', 'methionine',
+    'phenylalanine', 'proline', 'pyrrolysine', 'serine', 'selenocysteine',
+    'threonine', 'tryptophan', 'tyrosine', 'valine'
+  ] as Set
+
+  static final Map AminoAcidAbbrev3Map = [
+    'ala': 'alanine',
+    'arg': 'arginine',
+    'asn': 'asparagine',
+    'asp': 'aspartic acid',
+    'cys': 'cysteine',
+    'gln': 'glutamine',
+    'glu': 'glutamic acid',
+    'gly': 'glycine',
+    'his': 'histidine',
+    'ile': 'isoleucine',
+    'leu': 'leucine',
+    'lys': 'lysine',
+    'met': 'methionine',
+    'phe': 'phenylalanine',
+    'pro': 'proline',
+    'ser': 'serine',
+    'thr': 'threonine',
+    'trp': 'tryptophan',
+    'tyr': 'tyrosine',
+    'val': 'valine',
+  ]
+
+  static final Set AminoAcidAbbrev3s = AminoAcidAbbrev3Map.keySet()
+
+
+  static final Map AminoAcidAbbrev1Map = [
+    'A': 'alanine',
+    'R': 'arginine',
+    'N': 'asparagine',
+    'D': 'aspartic acid',
+    'C': 'cysteine',
+    'Q': 'glutamine',
+    'E': 'glutamic acid',
+    'G': 'glycine',
+    'H': 'histidine',
+    'I': 'isoleucine',
+    'L': 'leucine',
+    'K': 'lysine',
+    'M': 'methionine',
+    'F': 'phenylalanine',
+    'P': 'proline',
+    'O': 'pyrrolysine',
+    'S': 'serine',
+    'U': 'selenocysteine',
+    'T': 'threonine',
+    'W': 'tryptophan',
+    'Y': 'tyrosine',
+    'V': 'valine',
+  ]
+
+  static final Set AminoAcidAbbrev1s = AminoAcidAbbrev1Map.keySet()
+
 
   Map settings                              // class global settings
 
@@ -348,7 +410,33 @@ class FrextFormatter {
   def getSites (friesMap, event) {
     log.trace("(getSites): event=${event}")
     def siteArgs = getArgsByRole(event, 'site')
-    return derefEntities(friesMap, siteArgs)
+    def sites = derefEntities(friesMap, siteArgs).collect{ getSiteInformation(it) }
+    System.err.println("SITES=${sites}")    // REMOVE LATER
+    return sites
+  }
+
+  /** Return a map of Site information from the given Site entity. */
+  def getSiteInformation (siteEntity) {
+    def siteInfo = [:]
+    siteInfo['site_text'] = siteEntity['entity_text']
+    siteInfo['identifier'] = siteEntity['identifier']
+    siteInfo << parseSiteAbbreviations(siteInfo['site_text'])
+    siteInfo                                // return new information map
+  }
+
+  /**
+   * Deconstruct the given site abbreviation string into a (possibly empty) map
+   * containing the amino acid and the attachment position, if possible.
+   * Returns a (possibly empty) map of the pieces found, if any.
+   */
+  def parseSiteAbbreviations (siteText) {
+    def lcSiteText = siteText.toLowerCase()
+    System.err.println("lcSiteText=${lcSiteText}") // REMOVE LATER
+    if (lcSiteText in AminoAcidNames)       // look for full name
+      return [ "amino_acid": lcSiteText ]
+    else if (lcSiteText in AminoAcidAbbrev3s) // look for 3-letter abbreviations
+      return [ "amino_acid": AminoAcidAbbrev3Map.get(lcSiteText) ]
+    else return [:]                         // else failure: return empty map
   }
 
   /** Return a list of entity maps from the source arguments of the given event. */
