@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Begin heuristics to deconstruct site text.
+ *   Last Modified: Deconstruct site entities.
  */
 class FrextFormatter {
 
@@ -75,6 +75,8 @@ class FrextFormatter {
 
   static final Set AminoAcidAbbrev1s = AminoAcidAbbrev1Map.keySet()
 
+  static final AAAbbrev1Pat = ~'([ARNDCQEGHILKMFPOSUTWYV])(\\d+)'
+  static final AANameNumPat = ~"(?i)(${AminoAcidNames.join('|')})\\w*(\\d+)"
 
   Map settings                              // class global settings
 
@@ -411,7 +413,7 @@ class FrextFormatter {
     log.trace("(getSites): event=${event}")
     def siteArgs = getArgsByRole(event, 'site')
     def sites = derefEntities(friesMap, siteArgs).collect{ getSiteInformation(it) }
-    System.err.println("SITES=${sites}")    // REMOVE LATER
+    if (sites) System.err.println("SITES=${sites}") // REMOVE LATER
     return sites
   }
 
@@ -431,13 +433,34 @@ class FrextFormatter {
    */
   def parseSiteAbbreviations (siteText) {
     def lcSiteText = siteText.toLowerCase()
-    System.err.println("lcSiteText=${lcSiteText}") // REMOVE LATER
-    if (lcSiteText in AminoAcidNames)       // look for full name
+    System.err.println("AANNPat=${AANameNumPat}") // REMOVE LATER
+
+    if (lcSiteText in AminoAcidNames)       // look for full amino acid name
       return [ "amino_acid": lcSiteText ]
+
     else if (lcSiteText in AminoAcidAbbrev3s) // look for 3-letter abbreviations
       return [ "amino_acid": AminoAcidAbbrev3Map.get(lcSiteText) ]
+
+    // check for amino acid names followed by a position
+    else if (lcSiteText ==~ AANameNumPat) {
+      def parts = (lcSiteText =~ AANameNumPat)
+      if (parts[0].size() > 1)
+        return [ "amino_acid": parts[0][1], "position": parts[0][2] ]
+      else return [:]                       // else failure: return empty map
+    }
+
+    // check for uppercase 1-letter amino acid abbreviations followed by a position
+    else if (siteText ==~ AAAbbrev1Pat) {
+      def parts = (siteText =~ AAAbbrev1Pat)
+      def acid = AminoAcidAbbrev1Map.get(siteText[0])
+      if (acid && (parts[0].size() > 1))
+        return [ "amino_acid": acid, "position": parts[0][2] ]
+      else return [:]                       // else failure: return empty map
+    }
+
     else return [:]                         // else failure: return empty map
   }
+
 
   /** Return a list of entity maps from the source arguments of the given event. */
   def getSources (friesMap, event) {
