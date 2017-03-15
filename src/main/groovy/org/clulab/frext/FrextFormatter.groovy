@@ -8,43 +8,46 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Add abbrev3 site pattern. Handle residue noise in patterns.
+ *   Last Modified: Fixup UAZ amino acid grounding IDs after parsing.
  */
 class FrextFormatter {
 
   static final Logger log = LogManager.getLogger(FrextFormatter.class.getName());
 
   static final List AminoAcids = [
-    [ 'alanine',        'ala',  'A' ],
-    [ 'arginine',       'arg',  'R' ],
-    [ 'asparagine',     'asn',  'N' ],
-    [ 'aspartic acid',  'asp',  'D' ],
-    [ 'cysteine',       'cys',  'C' ],
-    [ 'glutamine',      'gln',  'Q' ],
-    [ 'glutamic acid',  'glu',  'E' ],
-    [ 'glycine',        'gly',  'G' ],
-    [ 'histidine',      'his',  'H' ],
-    [ 'isoleucine',     'ile',  'I' ],
-    [ 'leucine',        'leu',  'L' ],
-    [ 'lysine',         'lys',  'K' ],
-    [ 'methionine',     'met',  'M' ],
-    [ 'phenylalanine',  'phe',  'F' ],
-    [ 'proline',        'pro',  'P' ],
-    [ 'pyrrolysine',    'pyl',  'O' ],
-    [ 'selenocysteine', 'sec',  'U' ],
-    [ 'serine',         'ser',  'S' ],
-    [ 'threonine',      'thr',  'T' ],
-    [ 'tryptophan',     'trp',  'W' ],
-    [ 'tyrosine',       'tyr',  'Y' ],
-    [ 'valine',         'val',  'V' ]
+    [ 'alanine',        'ala',  'A',  'UAZ-S-001' ],
+    [ 'arginine',       'arg',  'R',  'UAZ-S-002' ],
+    [ 'asparagine',     'asn',  'N',  'UAZ-S-003' ],
+    [ 'aspartic acid',  'asp',  'D',  'UAZ-S-004' ],
+    [ 'aspartate',      'asp',  'D',  'UAZ-S-004' ],
+    [ 'cysteine',       'cys',  'C',  'UAZ-S-005' ],
+    [ 'glutamic acid',  'glu',  'E',  'UAZ-S-006' ],
+    [ 'glutamate',      'glu',  'E',  'UAZ-S-006' ],
+    [ 'glutamine',      'gln',  'Q',  'UAZ-S-007' ],
+    [ 'glycine',        'gly',  'G',  'UAZ-S-008' ],
+    [ 'histidine',      'his',  'H',  'UAZ-S-009' ],
+    [ 'isoleucine',     'ile',  'I',  'UAZ-S-010' ],
+    [ 'leucine',        'leu',  'L',  'UAZ-S-011' ],
+    [ 'lysine',         'lys',  'K',  'UAZ-S-012' ],
+    [ 'methionine',     'met',  'M',  'UAZ-S-013' ],
+    [ 'phenylalanine',  'phe',  'F',  'UAZ-S-014' ],
+    [ 'proline',        'pro',  'P',  'UAZ-S-015' ],
+    [ 'pyrrolysine',    'pyl',  'O',  'UAZ-S-021' ],
+    [ 'selenocysteine', 'sec',  'U',  'UAZ-S-022' ],
+    [ 'serine',         'ser',  'S',  'UAZ-S-016' ],
+    [ 'threonine',      'thr',  'T',  'UAZ-S-017' ],
+    [ 'tryptophan',     'trp',  'W',  'UAZ-S-018' ],
+    [ 'tyrosine',       'tyr',  'Y',  'UAZ-S-019' ],
+    [ 'valine',         'val',  'V',  'UAZ-S-020' ]
   ]
 
-  static final Set AminoAcidNames    = AminoAcids.collect{ it[0] } as Set
-  static final Set AminoAcidAbbrev3s = AminoAcids.collect{ it[1] } as Set
-  static final Set AminoAcidAbbrev1s = AminoAcids.collect{ it[2] } as Set
+  static final AminoAcidNames    = AminoAcids.collect{ it[0] } as Set
+  static final AminoAcidAbbrev3s = AminoAcids.collect{ it[1] } as Set
+  static final AminoAcidAbbrev1s = AminoAcids.collect{ it[2] } as Set
 
-  static final Map AminoAcidAbbrev3Map = AminoAcids.collectEntries{ [ (it[1]): it[0] ] }
-  static final Map AminoAcidAbbrev1Map = AminoAcids.collectEntries{ [ (it[2]): it[0] ] }
+  static final AminoAcidAbbrev3Map = AminoAcids.collectEntries{ [ (it[1]): it[0] ] }
+  static final AminoAcidAbbrev1Map = AminoAcids.collectEntries{ [ (it[2]): it[0] ] }
+  static final AminoAcidIdMap      = AminoAcids.collectEntries{ [ (it[0]): it[3] ] }
 
   static final AANamePat    = ~"(?i)(${AminoAcidNames.join('|')})(\\s|[_-])*(residues?)?"
   static final AANameNumPat = ~"(?i)(${AminoAcidNames.join('|')})(residues?|\\s|[_-])*(\\d+)"
@@ -57,7 +60,6 @@ class FrextFormatter {
   public FrextFormatter (settings) {
     log.trace("(FrextFormatter.init): settings=${settings}")
     this.settings = settings                // save incoming settings in global variable
-    // System.err.println("AAPrefixes=${AminoAcidPrefixes}") // REMOVE LATER
   }
 
 
@@ -397,7 +399,19 @@ class FrextFormatter {
     siteInfo['site_text'] = siteEntity['entity_text']
     siteInfo['identifier'] = siteEntity['identifier']
     siteInfo << parseSiteAbbreviations(siteInfo['site_text'])
+    fixAminoAcidGrounding(siteInfo)         // correct grounding using new information
     siteInfo                                // return new information map
+  }
+
+  /**
+   * Kludge to retroactively correct the grounding for amino acids which have
+   * recently been identified by site abbreviation parsing.
+   * NB: These Grounding IDs come from the Bioresources NER-Grounding-Override file
+   *     and should be kept in synch with that file or else error will ensue.
+   */
+  def fixAminoAcidGrounding (siteInfo) {
+    def aaId = AminoAcidIdMap.get(siteInfo.get('amino_acid'))
+    if (aaId) siteInfo['identifier'] = aaId
   }
 
   /**
