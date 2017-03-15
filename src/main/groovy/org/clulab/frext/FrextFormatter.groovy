@@ -8,72 +8,43 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Deconstruct site entities.
+ *   Last Modified: Convert to master amino acid data structure.
  */
 class FrextFormatter {
 
   static final Logger log = LogManager.getLogger(FrextFormatter.class.getName());
 
-  static final Set AminoAcidNames = [
-    'alanine', 'arginine', 'asparagine', 'aspartic acid', 'aspartate',
-    'cysteine', 'glutamic acid', 'glutamate', 'glutamine', 'glycine',
-    'histidine', 'isoleucine', 'leucine', 'lysine', 'methionine',
-    'phenylalanine', 'proline', 'pyrrolysine', 'serine', 'selenocysteine',
-    'threonine', 'tryptophan', 'tyrosine', 'valine'
-  ] as Set
-
-  static final Map AminoAcidAbbrev3Map = [
-    'ala': 'alanine',
-    'arg': 'arginine',
-    'asn': 'asparagine',
-    'asp': 'aspartic acid',
-    'cys': 'cysteine',
-    'gln': 'glutamine',
-    'glu': 'glutamic acid',
-    'gly': 'glycine',
-    'his': 'histidine',
-    'ile': 'isoleucine',
-    'leu': 'leucine',
-    'lys': 'lysine',
-    'met': 'methionine',
-    'phe': 'phenylalanine',
-    'pro': 'proline',
-    'ser': 'serine',
-    'thr': 'threonine',
-    'trp': 'tryptophan',
-    'tyr': 'tyrosine',
-    'val': 'valine',
+  static final List AminoAcids = [
+    [ 'alanine',        'ala',  'A' ],
+    [ 'arginine',       'arg',  'R' ],
+    [ 'asparagine',     'asn',  'N' ],
+    [ 'aspartic acid',  'asp',  'D' ],
+    [ 'cysteine',       'cys',  'C' ],
+    [ 'glutamine',      'gln',  'Q' ],
+    [ 'glutamic acid',  'glu',  'E' ],
+    [ 'glycine',        'gly',  'G' ],
+    [ 'histidine',      'his',  'H' ],
+    [ 'isoleucine',     'ile',  'I' ],
+    [ 'leucine',        'leu',  'L' ],
+    [ 'lysine',         'lys',  'K' ],
+    [ 'methionine',     'met',  'M' ],
+    [ 'phenylalanine',  'phe',  'F' ],
+    [ 'proline',        'pro',  'P' ],
+    [ 'pyrrolysine',    'pyl',  'O' ],
+    [ 'selenocysteine', 'sec',  'U' ],
+    [ 'serine',         'ser',  'S' ],
+    [ 'threonine',      'thr',  'T' ],
+    [ 'tryptophan',     'trp',  'W' ],
+    [ 'tyrosine',       'tyr',  'Y' ],
+    [ 'valine',         'val',  'V' ]
   ]
 
-  static final Set AminoAcidAbbrev3s = AminoAcidAbbrev3Map.keySet()
+  static final Set AminoAcidNames    = AminoAcids.collect{ it[0] } as Set
+  static final Set AminoAcidAbbrev3s = AminoAcids.collect{ it[1] } as Set
+  static final Set AminoAcidAbbrev1s = AminoAcids.collect{ it[2] } as Set
 
-
-  static final Map AminoAcidAbbrev1Map = [
-    'A': 'alanine',
-    'R': 'arginine',
-    'N': 'asparagine',
-    'D': 'aspartic acid',
-    'C': 'cysteine',
-    'Q': 'glutamine',
-    'E': 'glutamic acid',
-    'G': 'glycine',
-    'H': 'histidine',
-    'I': 'isoleucine',
-    'L': 'leucine',
-    'K': 'lysine',
-    'M': 'methionine',
-    'F': 'phenylalanine',
-    'P': 'proline',
-    'O': 'pyrrolysine',
-    'S': 'serine',
-    'U': 'selenocysteine',
-    'T': 'threonine',
-    'W': 'tryptophan',
-    'Y': 'tyrosine',
-    'V': 'valine',
-  ]
-
-  static final Set AminoAcidAbbrev1s = AminoAcidAbbrev1Map.keySet()
+  static final Map AminoAcidAbbrev3Map = AminoAcids.collectEntries{ [ (it[1]): it[0] ] }
+  static final Map AminoAcidAbbrev1Map = AminoAcids.collectEntries{ [ (it[2]): it[0] ] }
 
   static final AAAbbrev1Pat = ~'([ARNDCQEGHILKMFPOSUTWYV])(\\d+)'
   static final AANameNumPat = ~"(?i)(${AminoAcidNames.join('|')})\\w*(\\d+)"
@@ -433,7 +404,7 @@ class FrextFormatter {
    */
   def parseSiteAbbreviations (siteText) {
     def lcSiteText = siteText.toLowerCase()
-    System.err.println("AANNPat=${AANameNumPat}") // REMOVE LATER
+    // System.err.println("AANNPat=${AANameNumPat}") // REMOVE LATER
 
     if (lcSiteText in AminoAcidNames)       // look for full amino acid name
       return [ "amino_acid": lcSiteText ]
