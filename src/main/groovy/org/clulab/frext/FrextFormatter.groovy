@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Convert to master amino acid data structure.
+ *   Last Modified: Add abbrev3 site pattern. Handle residue noise in patterns.
  */
 class FrextFormatter {
 
@@ -46,8 +46,10 @@ class FrextFormatter {
   static final Map AminoAcidAbbrev3Map = AminoAcids.collectEntries{ [ (it[1]): it[0] ] }
   static final Map AminoAcidAbbrev1Map = AminoAcids.collectEntries{ [ (it[2]): it[0] ] }
 
+  static final AANamePat    = ~"(?i)(${AminoAcidNames.join('|')})(\\s|[_-])*(residues?)?"
+  static final AANameNumPat = ~"(?i)(${AminoAcidNames.join('|')})(residues?|\\s|[_-])*(\\d+)"
+  static final AAAbbrev3Pat = ~"(?i)(${AminoAcidAbbrev3s.join('|')})(\\s|[_-])*(\\d+)"
   static final AAAbbrev1Pat = ~'([ARNDCQEGHILKMFPOSUTWYV])(\\d+)'
-  static final AANameNumPat = ~"(?i)(${AminoAcidNames.join('|')})\\w*(\\d+)"
 
   Map settings                              // class global settings
 
@@ -55,6 +57,7 @@ class FrextFormatter {
   public FrextFormatter (settings) {
     log.trace("(FrextFormatter.init): settings=${settings}")
     this.settings = settings                // save incoming settings in global variable
+    // System.err.println("AAPrefixes=${AminoAcidPrefixes}") // REMOVE LATER
   }
 
 
@@ -404,28 +407,48 @@ class FrextFormatter {
    */
   def parseSiteAbbreviations (siteText) {
     def lcSiteText = siteText.toLowerCase()
-    // System.err.println("AANNPat=${AANameNumPat}") // REMOVE LATER
 
-    if (lcSiteText in AminoAcidNames)       // look for full amino acid name
-      return [ "amino_acid": lcSiteText ]
+    // check for full amino acid name followed by optional residue noise
+    if (lcSiteText ==~ AANamePat) {
+      def parts = (lcSiteText =~ AANamePat)
+      if (parts[0].size() > 1)              // redundant sanity check
+        return [ "amino_acid": parts[0][1] ]
+      else return [:]                       // else failure: return empty map
+    }
 
-    else if (lcSiteText in AminoAcidAbbrev3s) // look for 3-letter abbreviations
+    // check for just a 3-letter abbreviation
+    else if (lcSiteText in AminoAcidAbbrev3s)
       return [ "amino_acid": AminoAcidAbbrev3Map.get(lcSiteText) ]
 
-    // check for amino acid names followed by a position
+    // check for amino acid names followed by optional residue noise followed by a position
     else if (lcSiteText ==~ AANameNumPat) {
       def parts = (lcSiteText =~ AANameNumPat)
-      if (parts[0].size() > 1)
-        return [ "amino_acid": parts[0][1], "position": parts[0][2] ]
+      if (parts[0].size() > 2)              // redundant sanity check
+        return [ "amino_acid": parts[0][1], "position": parts[0][3] ]
+      else return [:]                       // else failure: return empty map
+    }
+
+    // check for 3-letter amino acid abbreviations followed by a position
+    else if (lcSiteText ==~ AAAbbrev3Pat) {
+      def parts = (lcSiteText =~ AAAbbrev3Pat)
+      if (parts[0].size() > 2) {            // redundant sanity check
+        def acid = AminoAcidAbbrev3Map.get(parts[0][1]) // expand abbreviation to name
+        if (acid)
+          return [ "amino_acid": acid, "position": parts[0][3] ]
+        else return [:]                     // else failure: return empty map
+      }
       else return [:]                       // else failure: return empty map
     }
 
     // check for uppercase 1-letter amino acid abbreviations followed by a position
     else if (siteText ==~ AAAbbrev1Pat) {
       def parts = (siteText =~ AAAbbrev1Pat)
-      def acid = AminoAcidAbbrev1Map.get(siteText[0])
-      if (acid && (parts[0].size() > 1))
-        return [ "amino_acid": acid, "position": parts[0][2] ]
+      if (parts[0].size() > 1) {            // redundant sanity checks
+        def acid = AminoAcidAbbrev1Map.get(siteText[0]) // expand abbreviation to name
+        if (acid)
+          return [ "amino_acid": acid, "position": parts[0][2] ]
+        else return [:]                     // else failure: return empty map
+      }
       else return [:]                       // else failure: return empty map
     }
 
