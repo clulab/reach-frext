@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Fixup UAZ amino acid grounding IDs after parsing.
+ *   Last Modified: Extract and output site information for modifications.
  */
 class FrextFormatter {
 
@@ -241,7 +241,8 @@ class FrextFormatter {
         def modMap = [ 'modification_type': mod['type'] ]
         if (mod['evidence'])  modMap << [ 'evidence': mod['evidence'] ]
         if (mod['negated'])  modMap << [ 'negated': mod['negated'] ]
-        if (mod['site'])  modMap << [ 'site': mod['site'] ]
+        if (mod['site'])
+          modMap['sites'] = getModificationSiteInformation(mod['site'])
         modMap
       }
     }
@@ -388,19 +389,28 @@ class FrextFormatter {
   def getSites (friesMap, event) {
     log.trace("(getSites): event=${event}")
     def siteArgs = getArgsByRole(event, 'site')
-    def sites = derefEntities(friesMap, siteArgs).collect{ getSiteInformation(it) }
+    def sites = derefEntities(friesMap, siteArgs).collect{ getEntitySiteInformation(it) }
     if (sites) System.err.println("SITES=${sites}") // REMOVE LATER
     return sites
   }
 
   /** Return a map of Site information from the given Site entity. */
-  def getSiteInformation (siteEntity) {
+  def getEntitySiteInformation (siteEntity) {
     def siteInfo = [:]
     siteInfo['site_text'] = siteEntity['entity_text']
     siteInfo['identifier'] = siteEntity['identifier']
     siteInfo << parseSiteAbbreviations(siteInfo['site_text'])
     fixAminoAcidGrounding(siteInfo)         // correct grounding using new information
     siteInfo                                // return new information map
+  }
+
+  /** Return a singleton list of Site information map from the given Site entity. */
+  def getModificationSiteInformation (siteText) {
+    def siteInfo = [:]
+    siteInfo['site_text'] = siteText
+    siteInfo << parseSiteAbbreviations(siteText)
+    fixAminoAcidGrounding(siteInfo)         // correct grounding using new information
+    [ siteInfo ]                            // return list of the site information map
   }
 
   /**
