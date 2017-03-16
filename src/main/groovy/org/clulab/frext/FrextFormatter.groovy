@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Extract and output site information for modifications.
+ *   Last Modified: Cleanup debugging.
  */
 class FrextFormatter {
 
@@ -390,7 +390,6 @@ class FrextFormatter {
     log.trace("(getSites): event=${event}")
     def siteArgs = getArgsByRole(event, 'site')
     def sites = derefEntities(friesMap, siteArgs).collect{ getEntitySiteInformation(it) }
-    if (sites) System.err.println("SITES=${sites}") // REMOVE LATER
     return sites
   }
 
