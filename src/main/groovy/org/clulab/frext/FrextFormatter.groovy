@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Cleanup debugging.
+ *   Last Modified: Assign translocation Theme to participant_b.
  */
 class FrextFormatter {
 
@@ -169,7 +169,7 @@ class FrextFormatter {
       def destArg = getDestinations(friesMap, event)?.getAt(0) // should be just 1 dest arg
       def sites = getSites(friesMap, event)
       if (patient && destArg) {
-        def evMap = [ 'participant_a': patient,
+        def evMap = [ 'participant_b': patient,
                       'to_location': destArg,
                       'predicate': predMap,
                       'sentence': event.sentence ?: '' ]
