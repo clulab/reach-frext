@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Assign translocation Theme to participant_b.
+ *   Last Modified: Redo for nested everything. Rename cross-references as links.
  */
 class FrextFormatter {
 
@@ -99,19 +99,20 @@ class FrextFormatter {
     log.trace("(FrextFormatter.getEvents): docId=${docId}")
     def outEvents = []
     friesMap.events.each { id, event ->
-      def newEvents = transformEvent(docId, friesMap, event)  // can be 1->N
+      def newEvents = transformEvent(docId, friesMap, event)  // can be 1->N or 1->0
       newEvents.each { outEvents << it }
     }
     return outEvents
   }
 
 
-  /** Return a tuple-like map created by processing the given event using the
-   *  given document ID, map of document sentence texts, and map of document
-   *  child texts (from controlled event mentions).
+  /** Return a list of maps created by processing the given event using the
+   *  given document ID, and a map of document sentences, entities, and events.
    */
   def transformEvent (docId, friesMap, event) {
     log.trace("(FrextFormatter.transformEvent): docId=${docId}, event=${event}")
+
+    if (!event) return []                   // sanity check
 
     def newEvents = []                      // list of new events created here
 
@@ -130,13 +131,13 @@ class FrextFormatter {
 
     // handle any nested events in activation or regulation
     if ((evType == 'activation') || (evType == 'regulation')) {
-      def patient = getControlled(docId, friesMap, event)
-      def agents = getControllers(friesMap, event)
-      agents.each { agent ->
-        def evMap = [ 'participant_a': agent,
-                      'predicate': predMap,
+      def patients = getControlleds(docId, friesMap, event)
+      def agents = getControllers(docId, friesMap, event)
+      if (patients && agents) {
+        def evMap = [ 'predicate': predMap,
+                      'participant_a': agents,
+                      'participant_b': patients,
                       'sentence': event.sentence ?: '' ]
-        if (patient) evMap['participant_b'] = patient
         newEvents << evMap
       }
     }
@@ -147,15 +148,15 @@ class FrextFormatter {
       def themes = getThemes(friesMap, event)
       def sites = getSites(friesMap, event)
       if (themes.size() == 2) {
-        def aToB = [ 'participant_a': themes[0],
-                     'participant_b': themes[1],
-                     'predicate': predMap,
+        def aToB = [ 'predicate': predMap,
+                     'participant_a': [ themes[0] ], // singleton list
+                     'participant_b': [ themes[1] ], // singleton list
                      'sentence': event.sentence ?: '' ]
         if (sites) aToB['sites'] = sites
         newEvents << aToB
-        def bToA = [ 'participant_a': themes[1],
-                     'participant_b': themes[0],
-                     'predicate': predMap,
+        def bToA = [ 'predicate': predMap,
+                     'participant_a': [ themes[1] ], // singleton list
+                     'participant_b': [ themes[0] ], // singleton list
                      'sentence': event.sentence ?: '' ]
         if (sites) bToA['sites'] = sites
         newEvents << bToA
@@ -164,16 +165,16 @@ class FrextFormatter {
 
     // handle translocation
     else if (evType == 'translocation') {
-      def patient = getThemes(friesMap, event)?.getAt(0) // should be just 1 theme arg
-      def srcArg = getSources(friesMap, event)?.getAt(0) // should be just 1 source arg
-      def destArg = getDestinations(friesMap, event)?.getAt(0) // should be just 1 dest arg
+      def patients = getThemes(friesMap, event)       // should be just 1 theme arg
+      def srcArgs = getSources(friesMap, event)       // should be just 1 source arg
+      def destArgs = getDestinations(friesMap, event) // should be just 1 dest arg
       def sites = getSites(friesMap, event)
-      if (patient && destArg) {
-        def evMap = [ 'participant_b': patient,
-                      'to_location': destArg,
-                      'predicate': predMap,
+      if (patients && destArgs) {
+        def evMap = [ 'predicate': predMap,
+                      'participant_b': patients,
+                      'to_location': destArgs,
                       'sentence': event.sentence ?: '' ]
-        if (srcArg) evMap['from_location'] = srcArg
+        if (srcArgs) evMap['from_location'] = srcArgs
         if (sites) evMap['sites'] = sites
         newEvents << evMap
       }
@@ -184,27 +185,13 @@ class FrextFormatter {
       def themes = getThemes(friesMap, event)
       def sites = getSites(friesMap, event)
       if (themes) {
-        // a modification event will have exactly one theme
-        def evMap = [ 'participant_b': themes[0],
-                      'predicate': predMap,
+        // a modification event should have exactly one theme
+        def evMap = [ 'predicate': predMap,
+                      'participant_b': themes,
                       'sentence': event.sentence ?: '' ]
         if (sites) evMap['sites'] = sites
         newEvents << evMap
       }
-    }
-
-    // handle everything else (is there anything else?)
-    else {
-      def sites = getSites(friesMap, event)
-      def args = (event.args) ? derefEntities(friesMap, event.args) : []
-      def evMap = [ 'predicate': predMap,
-                    'sentence': event.sentence ?: '' ]
-      if (args.size() > 0)
-        evMap << ['participant_a': args[0]]
-      if (args.size() > 1)
-        evMap << ['participant_b': args[1]]
-      if (sites) evMap['sites'] = sites
-      newEvents << evMap
     }
 
     return newEvents
@@ -281,10 +268,10 @@ class FrextFormatter {
       def aMap = [ 'role': arg['type'],
                    'text': arg['text'],
                    'argType': arg['argument-type'] ]
-      if (arg.get('arg'))
-        aMap << ['xref': arg['arg']]
-      if (arg.get('args'))
-        aMap['xrefs'] = arg.get('args')
+      if (arg.get('arg'))                   // arguments will have a link called 'arg'
+        aMap << ['link': arg['arg']]
+      if (arg.get('args'))                  // or a map of labeled links called 'args'
+        aMap['links'] = arg.get('args')
       return aMap
     }
   }
@@ -306,6 +293,32 @@ class FrextFormatter {
   }
 
 
+  /** Return a list of entity maps by dereferencing the entity cross-references in
+      the links (args fiels) map of the given argument-type=complex map. */
+  def derefComplex (friesMap, arg) {
+    if (!arg) return null                   // sanity check
+    def complexLinks = getComplexLinks(friesMap, arg)
+    return complexLinks.findResults { link ->
+      lookupEntity(friesMap, link)
+    }
+  }
+
+  /** Return a list of entity maps from the arguments in the given list of event arguments. */
+  def derefEntities (friesMap, argsList) {
+    if (!argsList) return []                // sanity check
+    argsList.findResults { arg ->
+      lookupEntity(friesMap, getEntityLink(arg))
+    }
+  }
+
+  /** Return an event map by dereferencing the event cross-reference in
+      the link (arg field) of the given argument-type=event map. */
+  def derefEvent (friesMap, arg) {
+    if (!arg) return null                   // sanity check
+    lookupEvent(friesMap, getEventLink(arg))
+  }
+
+
   /** Return a single map of salient properties from the named arguments of the given event. */
   def getArgByRole (event, role) {
     def argsWithRoles = getArgsByRole(event, role)
@@ -317,72 +330,102 @@ class FrextFormatter {
     return event.args.findResults { if (it?.role == role) it }
   }
 
-  /** Return a list of entity maps from the arguments in the given event arguments list. */
-  def derefEntities (friesMap, argsList) {
-    argsList.findResults { arg ->
-      lookupEntity(friesMap, getEntityXref(arg))
+
+  /** Check that the given argument-type entity map refers to a complex and return
+      a (possibly empty) list of the cross-reference link strings it contains. */
+  def getComplexLinks (friesMap, arg) {
+    if (arg && (arg?.argType == 'complex') && arg?.links)
+      return (arg.links).collect { role, link -> link }
+    else
+      return []                             // signal failure
+  }
+
+  /** Check that the given argument-type entity map refers to an entity and return
+      the entity cross-reference link string it contains, or else null. */
+  def getEntityLink (arg) {
+    if (!arg) return null                   // sanity check
+    return ((arg?.argType == 'entity') && arg?.link) ? arg.link : null
+  }
+
+  /** Check that the given argument-type entity map refers to an event and return
+      the event cross-reference link string it contains, or else null. */
+  def getEventLink (arg) {
+    if (!arg) return null                   // sanity check
+    return ((arg?.argType == 'event') && arg?.link) ? arg.link : null
+  }
+
+
+  /** Return a (possibly empty) list of maps from the controlled argument of
+      the given parent event. Returns null if no controlled argument found. */
+  def getControlleds (docId, friesMap, event) {
+    log.trace("(getControlleds): docId=${docId}, event=${event}")
+    def cntld = getArgByRole(event, 'controlled') // should be just 1 controlled arg
+    if (!cntld) return null                       // nothing controlled: exit out now
+
+    def cntldType = cntld.argType           // get type of controlled argument
+    if (cntldType == 'complex')             // special case for complex argument type
+      return derefComplex(friesMap, cntld)  // return list of cross-referenced entities
+
+    else if (cntldType == 'event') {        // if it has a controlled (nested) event
+      def cntldEvent = derefEvent(friesMap, cntld) // get the nested event
+      return transformEvent(docId, friesMap, cntldEvent) // recurse to process nested event
     }
+
+    else if (cntldType == 'entity')         // else if it is a directly controlled entity
+      return derefEntities(friesMap, [cntld]) // singleton list argument
+
+    else                                    // should never happen
+      log.error("(getControlleds): Unknown controlled type ${cntldType?:''}")
+
+    return null                             // should not get here
   }
 
-  /** Return an entity map from the given entity argument map. */
-  def derefEntity (friesMap, arg) {
-    if (!arg) return null                   // sanity check
-    lookupEntity(friesMap, getEntityXref(arg))
-  }
 
-  /** Return an event map from the given event argument map. */
-  def derefEvent (friesMap, arg) {
-    if (!arg) return null                   // sanity check
-    lookupEvent(friesMap, getEventXref(arg))
-  }
+  /** Return a list of maps from the controller argument of
+      the given parent event. Returns null if no controller argument found. */
+  def getControllers (docId, friesMap, event) {
+    log.trace("(getControllers): docId=${docId}, event=${event}")
+    def cntlr = getArgByRole(event, 'controller') // should be just 1 controller arg
+    if (!cntlr) return null                 // no controller: exit out now
 
-  /** Check that the given argument map refers to an entity and return the
-      entity cross-reference it contains, or else null. */
-  def getEntityXref (arg) {
-    if (!arg) return null                   // sanity check
-    return ((arg?.argType == 'entity') && arg?.xref) ? arg.xref : null
-  }
+    def cntlrType = cntlr.argType           // get type of controller argument
+    if (cntlrType == 'complex')             // special case for complex argument type
+      return derefComplex(friesMap, cntlr)  // return list of cross-referenced entities
 
-  /** Check that the given argument map refers to an event and return the
-      event cross-reference it contains, or else null. */
-  def getEventXref (arg) {
-    if (!arg) return null                   // sanity check
-    return ((arg?.argType == 'event') && arg?.xref) ? arg.xref : null
-  }
-
-  /** Return a controlled entity map from the controlled argument of the given event. */
-  def getControlled (docId, friesMap, event) {
-    log.trace("(getControlled): docId=${docId}, event=${event}")
-    def ctrld = getArgByRole(event, 'controlled') // should be just 1 controller arg
-    if (!ctrld) return null                       // nothing controlled: exit out now
-    if (ctrld.argType == 'event') {               // if it has a controlled (nested) event
-      def ctrldEvent = derefEvent(friesMap, ctrld)   // get the nested event
-      if (!ctrldEvent) return null                // bad nesting: exit out now
-      return transformEvent(docId, friesMap, ctrldEvent) // recurse to process nested event
+    else if (cntlrType == 'event') {        // else if it is an event
+      def cntlrEvent = derefEvent(friesMap, cntlr)  // get the nested event
+      return transformEvent(docId, friesMap, cntlrEvent) // recurse to process nested event
     }
-    else                                    // else it is a directly controlled entity
-      return derefEntity(friesMap, ctrld)
+
+    else if (cntlrType == 'entity')         // else if it is an entity
+      return derefEntities(friesMap, [cntlr]) // singleton list argument
+
+    else                                    // should never happen
+      log.error("(getControllers): Unknown controller type ${cntlrType?:''}")
+
+    return null                             // should not get here
   }
 
-  /** Return a list of controller entity maps from the controller argument of the given event. */
-  def getControllers (friesMap, event) {
-    log.trace("(getControllers): event=${event}")
-    def ctlr = getArgByRole(event, 'controller') // should be just 1 controller arg
-    if (ctlr)  {
-      if (ctlr.argType == 'complex') {
-        def themeRefs = getXrefsByPrefix(ctlr?.xrefs, 'theme')
-        return themeRefs.findResults { xref -> lookupEntity(friesMap, xref) }
-      }
-      else                                  // else it is a single controller event
-        return derefEntities(friesMap, [ctlr])
-    }
-  }
 
   /** Return a list of entity maps from the destination arguments of the given event. */
   def getDestinations (friesMap, event) {
     log.trace("(getDestinations): event=${event}")
     def destArgs = getArgsByRole(event, 'destination')
     return derefEntities(friesMap, destArgs)
+  }
+
+  /** Return a list of entity maps from the theme arguments of the given event. */
+  def getThemes (friesMap, event) {
+    log.trace("(getThemes): event=${event}")
+    def themeArgs = getArgsByRole(event, 'theme')
+    return derefEntities(friesMap, themeArgs)
+  }
+
+  /** Return a list of entity maps from the source arguments of the given event. */
+  def getSources (friesMap, event) {
+    log.trace("(getSources): event=${event}")
+    def srcArgs = getArgsByRole(event, 'source')
+    return derefEntities(friesMap, srcArgs)
   }
 
   /** Return a list of entity maps from the site arguments of the given event. */
@@ -479,46 +522,22 @@ class FrextFormatter {
   }
 
 
-  /** Return a list of entity maps from the source arguments of the given event. */
-  def getSources (friesMap, event) {
-    log.trace("(getSources): event=${event}")
-    def srcArgs = getArgsByRole(event, 'source')
-    return derefEntities(friesMap, srcArgs)
-  }
-
-  /** Return a list of entity maps from the theme arguments of the given event. */
-  def getThemes (friesMap, event) {
-    log.trace("(getThemes): event=${event}")
-    def themeArgs = getArgsByRole(event, 'theme')
-    return derefEntities(friesMap, themeArgs)
-  }
-
-
-  /** Return a list of mention cross references from the arguments in the given
-      cross reference map whose keys begins with the given prefix string. */
-  def getXrefsByPrefix (xrefsMap, prefix) {
-    if (!xrefsMap) return null              // sanity check
-    return xrefsMap.findResults { xrRole, xref ->
-      if (xrRole.startsWith(prefix))  return xref
-    }
-  }
-
   /** Return the entity map referenced by the given entity cross-reference or null. */
-  def lookupEntity (friesMap, xref) {
-    if (!xref) return null                  // sanity check
-    return friesMap['entities'].get(xref)
+  def lookupEntity (friesMap, link) {
+    if (!link) return null                  // sanity check
+    return friesMap['entities'].get(link)
   }
 
   /** Return the event map referenced by the given event cross-reference or null. */
-  def lookupEvent (friesMap, xref) {
-    if (!xref) return null                  // sanity check
-    return friesMap['events'].get(xref)
+  def lookupEvent (friesMap, link) {
+    if (!link) return null                  // sanity check
+    return friesMap['events'].get(link)
   }
 
   /** Return a map of salient properties from the given entity cross-reference. */
-  def lookupSentence (friesMap, sentXref) {
-    if (!sentXref) return null              // propogate null
-    return friesMap['sentences'].get(sentXref)
+  def lookupSentence (friesMap, sentLink) {
+    if (!sentLink) return null              // propogate null
+    return friesMap['sentences'].get(sentLink)
   }
 
   /** Output the given document to a file in the output directory given in settings. */
