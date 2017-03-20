@@ -8,7 +8,7 @@ import groovy.json.*
  * format more suitable for loading into a Biopax program.
  *
  *   Written by: Tom Hicks. 3/5/2017.
- *   Last Modified: Redo for nested everything. Rename cross-references as links.
+ *   Last Modified: Change binding to one event with all participants.
  */
 class FrextFormatter {
 
@@ -147,19 +147,12 @@ class FrextFormatter {
       predMap['type'] = 'binds'             // rename 'complex-assembly'
       def themes = getThemes(friesMap, event)
       def sites = getSites(friesMap, event)
-      if (themes.size() == 2) {
-        def aToB = [ 'predicate': predMap,
-                     'participant_a': [ themes[0] ], // singleton list
-                     'participant_b': [ themes[1] ], // singleton list
-                     'sentence': event.sentence ?: '' ]
-        if (sites) aToB['sites'] = sites
-        newEvents << aToB
-        def bToA = [ 'predicate': predMap,
-                     'participant_a': [ themes[1] ], // singleton list
-                     'participant_b': [ themes[0] ], // singleton list
-                     'sentence': event.sentence ?: '' ]
-        if (sites) bToA['sites'] = sites
-        newEvents << bToA
+      if (themes.size() > 1) {
+        def evMap = [ 'predicate': predMap,
+                      'participant_b': themes,
+                      'sentence': event.sentence ?: '' ]
+        if (sites) evMap['sites'] = sites
+        newEvents << evMap
       }
     }
 
