@@ -20,9 +20,9 @@ To build the standalone JAR file in the build/libs subdirectory:
 To run the JAR file:
 
 ```
-   > java -jar frext-1.0.0.jar -v /input/dir/path
+   > java -jar frext-1.2.1.jar -v /input/dir/path
 OR
-   > java -jar frext-1.0.0.jar -v -o output/dir/path /input/dir/path
+   > java -jar frext-1.2.1.jar -v -o output/dir/path /input/dir/path
 ```
 
 Run Options:
