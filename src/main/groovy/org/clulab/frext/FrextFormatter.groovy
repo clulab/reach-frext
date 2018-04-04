@@ -77,16 +77,24 @@ class FrextFormatter {
       else [:]                              // else JSON was missing in file
     }
 
+    def frextDoc = friesToFrext(docId, friesMap)
+
+    outputDocument(docId, frextDoc)
+    return 1
+  }
+
+  /** Obtain frext output content for a single doc set. */
+  def friesToFrext (docId, friesMap) {
     // extract relevant information from the data structures:
     friesMap['sentences'] = extractSentenceTexts(friesMap)  // must be extracted before others
     friesMap['entities']  = extractEntityMentions(friesMap) // must be extracted before events
     friesMap['events']    = extractEventMentions(friesMap)
 
     // build a new document with the information extracted from the FRIES format
-    def outDoc = getMetaData(docId, friesMap)
-    outDoc['events'] = getEvents(docId, friesMap)
-    outputDocument(docId, outDoc)
-    return 1
+    def frextDoc = getMetaData(docId, friesMap)
+    frextDoc['events'] = getEvents(docId, friesMap)
+
+    return frextDoc
   }
 
   /** Begin the output document for a single paper by adding any metadata. */
