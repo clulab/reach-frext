@@ -1,10 +1,12 @@
 plugins {
   id 'groovy'
+  id 'maven-publish'
   id 'application'
   id 'com.github.johnrengelman.shadow' version '1.2.4'
 }
 
 apply plugin: 'groovy'
+apply plugin: 'maven-publish'
 apply plugin: 'application'
 apply plugin: 'com.github.johnrengelman.shadow'
 
@@ -27,8 +29,22 @@ tasks.withType(GroovyCompile) {
 }
 
 mainClassName = 'org.clulab.frext.Frext'
+group = 'org.clulab.frext'
 sourceCompatibility = 1.8
 version = '1.2.1'
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      from components.java
+    }
+  }
+}
+
+jar {
+  exclude('PMC-files_list.tsv.gz')
+}
+
 
 shadowJar {
   manifest {
